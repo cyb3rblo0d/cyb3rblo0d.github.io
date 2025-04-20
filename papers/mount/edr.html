@@ -20,12 +20,12 @@
 </style>
 
 <h2 id="1-introdu-o">1. Introdução</h2>
-<p>Soluções EDR aka (Endpoint Detection and Response) são uma evolução dos softwares de segurança que conhecemos como antivírus, EDRs modermos usam tecnicas avanças para detectar ameaça, Hookando APIS, isolando o host da internet, analisando comportamento e classificando a detecção por regra de Indicador de Compromisso (IOC) classificadas pelo MITRE ATT&amp;CK</p>
-<p>nesse artigo demonstrarei como burlar EDRs usando tecnicas evasivas </p>
+<p>Soluções EDR aka (Endpoint Detection and Response) são uma evolução dos softwares de segurança que conhecemos como antivírus, Enquanto soluções AV clássicas dependem principalmente de assinaturas estáticas, os EDRs modernos empregam técnicas avançadas como hooking de APIs, análise comportamental, isolamento de hosts e classificação de detecções baseadas no framework MITRE ATT&CK</p>
+<p>nesse artigo demonstrarei como burlar EDRs usando técnicas evasivas na criação deu seu loader personalizado </p>
 <h2 id="2-analise-tecnica">2. Analise Tecnica</h2>
 <p>em um ataque real é comun o uso de &quot;Loaders&quot; e &quot;Droppers&quot; que carregam o malware principal passando por &#39;estagios&#39;
 esses estagios podem variar dependendo da complexidade do malware algo que conhecemos como Chain ou Cadeia
-isso é necessário para nosso ataque não seja interrompido por um AV/EDRs rodando em segundo plano </p>
+isso é nescesario para nosso ataque não seja interrompido por um AV/EDRs rodando em segundo plano </p>
 <p>aqui abaixo está um loader shellcode super simples:</p>
 <pre><code class="lang-cpp">#include &lt;stdio.h&gt;
 #include &lt;stdlib.h&gt;
@@ -81,10 +81,10 @@ int main() {
     return <span class="hljs-number">0</span>;
 }
 </code></pre>
-<p>o codigo aloca memoria no proprio processo, copia o shellcode para essa região
+<p>o Loader acima aloca memoria no proprio processo, copia o shellcode para essa região
 e define permissão de RWX (Leitura, Escrita e Execução), 
 apos isso inicia uma Thread passando essa região como endereço.</p>
-<p>vamos scannear o binario e ver o AV acha disso:</p>
+<p>vamos scannear o binario e ver o que o AV acha disso (estou usando uma ferramenta minha para analisar o binario):</p>
 <pre><code>C:\Users\mount\Desktop\&gt;avfind.exe -defender -path shit-loader.exe
 2025/03/29 15:13:57 Scanning the file with Windows Defender: shit-loader.exe
 2025/03/29 15:13:57 Threats found in the file. Starting the binary search
@@ -98,6 +98,13 @@ apos isso inicia uma Thread passando essa região como endereço.</p>
 é uma ameaça...</p>
 <p>olhando no IDA pro e procurando por essa sequencia hexadecimal vamos encontrar o nosso shellcode de calculadora</p>
 <p><img src="../../static/calc.png" alt="map"></p>
+Pontos críticos de detecção:
+<ul>
+    <li>Shellcode sendo passado a limpo em variavel gerando uma entropia alta</li>
+    <li>Shellcode não ofuscado no binário</li>
+    <li>Padrão de alocação e execução direta</li>
+</ul>
+Vamos melhorar um pouco nosso codigo.
 <h2 id="obfuscation-web-estagio">Obfuscation + Web Estagio</h2>
 <p>oque mudou?</p>
 <pre><code>-<span class="ruby"> payload com AES
@@ -313,7 +320,7 @@ evitando hooks de API. Isso permite que o programa interaja com o kernel sem pas
 Ao utilizar SysWhispers, é possível gerar cabeçalhos e implementações que encapsulam chamadas de syscall, permitindo 
 que o desenvolvedor invoque funções do kernel de forma discreta. evitando detecções baseadas em hooks de API. </p>
 </p><p><img src="../../static/Usermode_hooking_principle.png" alt="map"></p>
-<h2 id="ignorando-a-solu-o-av">Ignorando a solução AV</h2>
+<h2 id="ignorando-a-solu">Ignorando a solução EDR</h2>
 <p>Vamos instalar o OpenEDR da xcitium para a POC final.
 <a href="https://www.openedr.com/">https://www.openedr.com/</a></p>
 <p><img src="../../static/edr.png" alt="map"></p>
@@ -327,7 +334,6 @@ que o desenvolvedor invoque funções do kernel de forma discreta. evitando dete
     NtResumeThread,
     NtWaitForSingleObject -o syscalls_mem
 </p>
-<p>codigo final:
-<a href="final-code.txt">loader.c</a>
+<p>codigo final: <a href="final-code.txt">loader.c</a><p>
 <p><img src="../../static/bypass.png" alt="map"></p>
 
