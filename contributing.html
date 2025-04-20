@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cyberblood - Contributing</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: monospace;
+      margin: 0;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.4;
+      text-transform: lowercase;
+      padding-bottom: 100px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: #fff;
+      font-size: 30px;
+      text-align: center;
+      font-weight: normal;
+      margin: 0 0 30px 0;
+      font-family: 'VT323', monospace;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      width: 100%;
+    }
+
+    .section-title {
+      color: #fff;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+      margin-bottom: 15px;
+      font-family: 'VT323', monospace;
+    }
+
+    a {
+      color: #fff;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .navbar {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+
+    .navbar a {
+      margin: 0 10px;
+    }
+
+    .step {
+      margin-bottom: 15px;
+    }
+
+    .step-title {
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #000;
+      padding: 10px 0;
+      border-top: 1px solid #333;
+      text-align: center;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .footer .section-title {
+      margin-bottom: 10px;
+    }
+
+    .footer div {
+      margin: 5px 0;
+    }
+
+    .footer-section {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+    }
+    .imageport {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .imageport img {
+      max-width: 30%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="navbar">
+      <div>
+        <a href="/">[home]</a>
+        <a href="papers.html">[papers]</a>
+        <a href="exploits.html">[exploits]</a>
+        <a href="tools.html">[tools]</a>
+        <a href="contributing.html">[contributing]</a>
+      </div>
+    </div>
+    <h1>[ CONTRIBUTING ]</h1>
+    <div class="imageport">
+        <img src="static/tumblr_6da0d4558ef3317ed4e025d57b81747e_12b2ca8e_1280.webp"/>
+      </div>
+    <div class="section">
+      <div class="section-title">// how to submit a paper</div>
+      <div class="step">
+        <div class="step-title">[step 1] prepare your paper</div>
+        <div>write your paper in plain text (.txt) or markdown (.md) format. ensure it covers a relevant topic in cybersecurity, hacking, or related fields. include your handle and the date at the top.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">[step 2] review guidelines</div>
+        <div>check that your paper is original, respects anonymity, and avoids illegal content. keep it technical and concise, with clear explanations and examples where applicable.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">[step 3] encrypt your submission</div>
+        <div>encrypt your paper using our pgp key (available below). include your handle in the message but avoid real-world identifiers.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">[step 4] send via irc</div>
+        <div>join our irc channel (#----- @ -----) and send the encrypted file to an admin. alternatively, upload it to ------ (port 23) under the submissions directory.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">[step 5] await review</div>
+        <div>our team will review your submission for quality and relevance. you'll be notified via irc or bbs if your paper is accepted or needs revisions.</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <div class="footer-title">Contact</div>
+    <div class="footer-section">
+      <div>irc: #----- @ -----</div>
+      <div>#----- @ ----- (port 23)</div>
+      <div>pgp: -----</div>
+    </div>
+  </div>
+</body>
+</html>

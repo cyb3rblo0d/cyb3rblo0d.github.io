@@ -1,0 +1,401 @@
+<style>
+    body {
+        background-color: black;
+        color: white;
+        font-family: monospace;
+    }
+
+    
+</style>
+
+
+<h1 id="when-smart-contracts-act-dumb-part-i-pt-br">When Smart Contracts Act Dumb PART I: PT-BR</h1>
+<p><strong>Date</strong>: 2024-04-08
+<strong>Tags</strong>: Pentest, Crypto, Web3
+<strong>Category</strong>: security</p>
+<p>Um overview completo e prático sobre vulnerabilidades Web3.</p>
+<ul>
+<li>paper by wzx</li>
+</ul>
+<p>Antes de começarmos de fato a falar sobre as vulnerabilidades em um smart contract e sua exploração, existem alguns conceitos teóricos importantes para entendermos exatamente com o que estamos lidando e o que buscamos. Nisto, Irei dar uma breve explicação sobre o que é a blockchain como conhecemos hoje.</p>
+<p>Outro detalhe que menciono desde o início é que teremos como foco a exploração do Solidity e da rede Ethereum neste paper, o que irá explorar alguns metódos específicos, como o Proof-of-Stake (PoS) e o modelo de compilação do Solidity</p>
+<pre><code>
+┌──┬─────────────────────────────────────────┐
+│<span class="hljs-number">1</span> │Paper                                    │
+│<span class="hljs-number">2</span> │ ├─Blockchain                            │
+│<span class="hljs-number">3</span> │ │  ├─O Processo ao Confirmar a Transação│
+│<span class="hljs-number">4</span> │ │  ├─Smart Contracts                    │
+│<span class="hljs-number">5</span> │ │  ├─Ethereum e Solidity                │
+│<span class="hljs-number">6</span> │ │  └─MINT, STAKE, BURN e Tokenização    │
+│<span class="hljs-number">7</span> │ ├─Vulnerabilidades                      │
+│<span class="hljs-number">8</span> │ │  ├─.getStorageAt                      │
+│<span class="hljs-number">9</span> │ │  ├─TimeStamp dependence               │
+│<span class="hljs-number">10</span>│ │  ├─Randomness                         │
+│<span class="hljs-number">11</span>│ │  └─front-running attack               │
+│<span class="hljs-number">12</span>│ └─Conclusão                             │
+└──┴─────────────────────────────────────────┘
+</code></pre><hr>
+<h4 id="blockchain">Blockchain</h4>
+<p><em>“A <strong>blockchain</strong> (também conhecida como cadeia de blocos) é uma tecnologia que visa a <strong>descentralização como medida de segurança</strong>. Trata-se de uma base de registros e dados distribuídos e compartilhados, cuja função é criar um índice global para todas as transações que ocorrem em determinado sistema ou rede.”</em></p>
+<p>Ou seja, de forma simples, a blockchain funciona como uma espécie de <strong>registro público e imutável</strong> — similar a um extrato — que armazena transações ocorridas ao longo do tempo. O modelo mais comum hoje é aquele em que <strong>cada novo bloco é gerado com base no hash do bloco anterior</strong>, criando uma cadeia contínua e criptograficamente vinculada.</p>
+<p>Essa estrutura garante que todos possam <strong>verificar a autenticidade das transações</strong>, mas <strong>sem poder alterá-las</strong>, já que qualquer modificação em um bloco invalidaria todos os blocos subsequentes, tornando a fraude evidente e rejeitada pela rede.</p>
+<hr>
+<pre><code>
+                ┌─────┐      ┌─────┐     ┌─────┐      ┌─────┐
+                │ <span class="hljs-selector-tag">B1</span>  ├──┐   │ <span class="hljs-selector-tag">B2</span>  ├─┐   │ <span class="hljs-selector-tag">B3</span>  ├───┐  │ <span class="hljs-selector-tag">B4</span>  │
+                │ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:A</span> │  └───┤ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:B</span> │ └───┤ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:C</span> │   └──┤ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:D</span> │
+                │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:X</span> │      │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:Y</span> │     │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:Z</span> │      │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:W</span> │
+                │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:0</span> │      │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:A</span> │     │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:B</span> │      │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:C</span> │
+                └─────┘      └─────┘     └─────┘      └─────┘
+</code></pre><hr>
+<p>No Ethereum utilizamos o Proof-of-Stake (PoS) que difere do bitcoin, que utiliza o Proof of Work (PoW) - lembra daquele velho conceito de um monte de placas de vídeo para resolver um problema matemático? É isso.  O PoS utiliza uma abordagem mais econômica, mas bem interessante.</p>
+<p>Imagine que você deseja enviar 100 reais em Ether (ETH) para uma pessoa chamada Y usando a rede Ethereum, como se fosse um PIX. Ao clicar em &quot;confirmar&quot; para enviar a transação, o processo não depende de um banco centralizado, mas de validadores distribuídos na blockchain. Vamos explorar como o Proof of Stake (PoS) torna isso possível, garantindo segurança e eficiência.</p>
+<hr>
+<h4 id="o-processo-ao-confirmar-a-transa-o">O Processo ao Confirmar a Transação</h4>
+<p>Quando você inicia a transação, a rede Ethereum seleciona aleatoriamente alguns validadores — participantes que depositaram uma quantidade significativa de ETH (geralmente 32 ETH) como garantia — neste momento que de fato é feito o <em>Stake</em>. Esses validadores têm a tarefa de verificar se tudo está em ordem: seu saldo é suficiente? A transação foi enviada no momento correto? Há conformidade com as regras da rede? Para isso, eles analisam as condições simulando a transação em um ambiente idêntico ao seu, como se estivessem usando o próprio dinheiro para testar. </p>
+<pre><code>
+                ┌─────┐      ┌─────┐      ┌─────┐      ┌─────┐
+                │ <span class="hljs-selector-tag">B1</span>  ├──┐   │ <span class="hljs-selector-tag">B2</span>  ├──┐   │ <span class="hljs-selector-tag">B3</span>  ├──┐   │ <span class="hljs-selector-tag">B4</span>  │
+                │ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:A</span> │  └───┤ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:B</span> │  └───┤ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:C</span> │  └───┤ <span class="hljs-selector-tag">H</span><span class="hljs-selector-pseudo">:D</span> │
+                │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:0</span> │      │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:0</span> │      │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:0</span> │      │ <span class="hljs-selector-tag">D</span><span class="hljs-selector-pseudo">:T</span> │
+                │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:0</span> │      │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:A</span> │      │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:B</span> │      │ <span class="hljs-selector-tag">P</span><span class="hljs-selector-pseudo">:C</span> │
+                └─────┘      └─────┘      └─────┘      └─────┘
+                       ↑             ↑            ↑
+                ┌──────┐      ┌──────┐      ┌──────┐
+                │ <span class="hljs-selector-tag">V1</span>   │      │ <span class="hljs-selector-tag">V2</span>   │      │ <span class="hljs-selector-tag">V3</span>   │
+                │ <span class="hljs-selector-tag">S</span><span class="hljs-selector-pseudo">:32</span> │      │ <span class="hljs-selector-tag">S</span><span class="hljs-selector-pseudo">:32</span> │      │ <span class="hljs-selector-tag">S</span><span class="hljs-selector-pseudo">:32</span> │
+                │ <span class="hljs-selector-tag">T</span><span class="hljs-selector-pseudo">:X</span>  │      │ <span class="hljs-selector-tag">T</span><span class="hljs-selector-pseudo">:X</span>  │      │ <span class="hljs-selector-tag">T</span><span class="hljs-selector-pseudo">:X</span>  │
+                └──────┘      └──────┘      └──────┘
+</code></pre><blockquote>
+<ul>
+<li><strong>B1, B2, B3, B4</strong>: Blocos da blockchain.</li>
+<li><strong>H</strong>: Hash do bloco (ex.: A, B, C, D).</li>
+<li><strong>D</strong>: Dados do bloco (ex.: 0 = vazio, T = transação).</li>
+<li><strong>P</strong>: Hash do bloco anterior (ex.: 0, A, B, C).</li>
+<li><strong>V1, V2, V3</strong>: Validadores.</li>
+<li><strong>S</strong>: Stake em ETH (ex.: 32).</li>
+<li><strong>T</strong>: Transação sendo validada (ex.: X). </li>
+</ul>
+</blockquote>
+<p>Eles executam a blockchain inteira, passo a passo, para confirmar que sua transferência é válida. Se todas as condições forem atendidas, a transação é aprovada: o valor é enviado para Y e registrado em um novo bloco, como uma entrada no &quot;extrato&quot; da blockchain.</p>
+<p>No PoS, os validadores são incentivados a agir corretamente. Se a transação for validada com sucesso, eles recebem uma recompensa em ETH — um pequeno pagamento por seu trabalho, semelhante a um &quot;cashback&quot; pelo esforço. Porém, se houver falhas ou tentativas de fraude — como aprovar uma transação inválida —, a rede aplica o <em>slashing</em>. Isso significa que uma parte (ou até todo) o ETH que eles depositaram como garantia é confiscada, funcionando como uma penalidade. Essa punição pode afetar todos os validadores envolvidos no erro, garantindo que haja um custo real para ações mal-intencionadas.</p>
+<hr>
+<h4 id="smart-contracts-">Smart Contracts:</h4>
+<p><em>Smart contracts, termo popularizado por Szabo (1997), são códigos autoexecutáveis armazenados na blockchain que automatizam acordos sem intermediários. Por exemplo, um contrato pode liberar fundos automaticamente ao detectar uma condição, como o recebimento de um pagamento.</em> </p>
+<p>todo Smart Contract (na rede Ethereum) passa por um processo de desenvolvimento, e deploy, onde alguns tópicos são fundamentais para o entendimento do funcionamento deste.</p>
+<ul>
+<li><p>O deploy é de fato lançar o seu contrato na blockchain. O contrato será compilado e otimizado para bytecode, em um modelo onde pode ser digerido e executado pela EVM.</p>
+</li>
+<li><p>O gas (gasoline) é uma comparação ao combustível, isto é, uma representação numérica do quanto de valor computacional será gasto para a execução daquele bloco de código - como o ponteiro de alguns carros, avisando o quanto de gasolina está sendo consumida - e como qualquer combustível, ele tem um valor a ser pago em ETH para aquele que utilizar. Ele serve para evitar abusos na rede, como loops infinitos ou spam, e recompensa os validadores por processarem transações.</p>
+</li>
+<li><p>a memory pool (mempool) é um termo comum para representar o pequeno hiato entre o evento de envio do valor e adição ao bloco. A transação realizada ela fica disponível para todos os node e também os validadores, para poderem fazer o stake. </p>
+</li>
+</ul>
+<hr>
+<h4 id="ethereum-e-solidity">Ethereum e Solidity</h4>
+<p><em>“O Ethereum, lançado por Buterin (2013) em seu whitepaper, é uma blockchain que expande o conceito de criptomoeda ao permitir a execução de smart contracts. Ele opera com a Ethereum Virtual Machine (EVM), uma camada computacional descentralizada que processa esses contratos, utilizando Ether para pagar taxas de gás, como explicado em Wood (2014), a documentação técnica da rede. Isso diferencia o Ethereum de redes como o Bitcoin, focadas apenas em transações. ”</em></p>
+<p>Solidity é a linguagem projetada para criar smart contracts no Ethereum. Introduzida como parte do ecossistema Ethereum, é uma linguagem compilada que gera bytecode para a EVM. Segundo a documentação oficial do Solidity (Solidity Team, 2023), ela suporta estruturas como funções e eventos, permitindo lógica complexa. Um exemplo básico seria:</p>
+<pre><code>
+<span class="hljs-keyword">pragma</span> solidity ^<span class="hljs-number">0.8</span>.0;
+contract SimpleStorage {
+    <span class="hljs-built_in">uint</span> <span class="hljs-keyword">public</span> storedData;
+    <span class="hljs-built_in">function</span> set(<span class="hljs-built_in">uint</span> x) <span class="hljs-keyword">public</span> {
+        storedData = x;
+    }
+}
+</code></pre><blockquote>
+<p>pragma solidity ^0.8.0 -&gt; compatibilidade de execução com versões iguais ou superiores
+contract -&gt; inicia de fato o que estará incluso no contrato
+uint public -&gt; uma variavel do tipo unint (unsigned integer) de visibilidade pública </p>
+</blockquote>
+<p>Neste contrato simples, um dado é guardado em valor público, o que permite que ela também seja suscetivo a mudanças.</p>
+<hr>
+<h3 id="mint-stake-burn-e-tokeniza-o-">MINT, STAKE, BURN e Tokenização:</h3>
+<p>Da mesma forma que uma economia valoriza objetos e valores simbólicos, as criptomoedas também podem realizar este mesmo processo: criando os famigerados, NFT’s e também a tokenização de ativos.</p>
+<p>*”Tokenizar é o ato de fragmentar um ativo em pequenas frações digitais usando o banco de dados blockchain. Essa transformação, conhecida como tokenização, dá origem a um token, que é uma representação digital de um determinado ativo, seja dinheiro, um direito ou uma propriedade[...]” </p>
+<p>Isto significa, que imóveis, objetos, ações podem equivaler a um token! Com isto, o smart contracts chegaram para ao ramo corporativo já com uma visão de mercado bem mais afiada do que um simples trading ou investimento. </p>
+<p>Mas todo token deve ter um ciclo de vida, correto? Início meio e fim. </p>
+<p>Mint: é o processo de nascimento do token, onde um número decidido e gerenciado pelo Owner do contrato é aplicado e assim gerado. </p>
+<p>Stake: É o ato de investir, de deixar o seu token “travado” em algum bloco ou ação, onde ele irá gerar rendimento passivo para o seu dono. </p>
+<p>Burn: Da mesma forma que se um dia você quiser queimar seu dinheiro, você também pode fazer isto com o token. Por mais que pareça uma ideia de maluco, isto serve para controlar número de transações e valor que circula o mercado.</p>
+<hr>
+<h3 id="vulnerabilidades">Vulnerabilidades</h3>
+<h2 id="-getstorageat">.getStorageAt</h2>
+<p>Antes de entendermos de fato as vulnerabilidades nos contratos Solidity, vamos primeiro explorar o funcionamento da Ethereum virtual machine (EVM), em específico, o seu gerenciamento de memória. 
+Todo dado do Smart  Contract, é guardada dentro de um array pela EVM, onde tem a sua <code>length</code>calculada em 2^256 slots na blockchain, sendo para cada slot, possível guardar 32 bytes de dados. Um detalhe importante é que eles funcionam em cascata, isto quer dizer que a ordem dos blocos se deriva da ordem que foram declarados.</p>
+<p>O armazenamento de dados do Smart contract é otimizado para buscar o minimo de ocupação de espaço. Caso duas variáveis estejam dentro do mesmo slot de 32 bytes, elas são guardadas no mesmo slot, em um packing.  </p>
+<pre><code>
+{
+<span class="hljs-symbol">uint8</span>    =&gt; <span class="hljs-number">1</span> <span class="hljs-keyword">byte </span> 
+<span class="hljs-symbol">uint16</span>   =&gt; <span class="hljs-number">2</span> <span class="hljs-keyword">bytes </span><span class="hljs-keyword">and </span>so on  
+<span class="hljs-symbol">uint256</span>  =&gt; <span class="hljs-number">32</span> <span class="hljs-keyword">bytes </span> 
+<span class="hljs-keyword">bool </span>    =&gt; <span class="hljs-number">1</span> <span class="hljs-keyword">byte </span> 
+<span class="hljs-keyword">address </span> =&gt; <span class="hljs-number">20</span> <span class="hljs-keyword">byte </span> 
+<span class="hljs-keyword">bytes1 </span>  =&gt; <span class="hljs-number">1</span> <span class="hljs-keyword">byte </span> 
+<span class="hljs-keyword">bytes2 </span>  =&gt; <span class="hljs-number">2</span> <span class="hljs-keyword">bytes </span><span class="hljs-keyword">and </span>so on
+}
+</code></pre><p>Um exemplo in-code</p>
+<pre><code>
+contract storage {
+    <span class="hljs-keyword">uint</span> <span class="hljs-keyword">public</span> number = <span class="hljs-number">1</span>;    <span class="hljs-comment">// 32 bytes ────────────── SLOT 0</span>
+    <span class="hljs-keyword">bool</span> <span class="hljs-keyword">public</span> check = <span class="hljs-literal">true</span>;  <span class="hljs-comment">// 1 byte  ──────────┐</span>
+    address <span class="hljs-keyword">public</span> member = address(<span class="hljs-number">0</span>); <span class="hljs-comment">// 20 bytes ├──── SLOT 1</span>
+    <span class="hljs-keyword">bool</span> <span class="hljs-keyword">public</span> check2 = <span class="hljs-literal">false</span>;<span class="hljs-comment">// 1 byte  ──────────┘</span>
+    bytes32 <span class="hljs-keyword">public</span> data;       <span class="hljs-comment">// 32 bytes  ───────────── SLOT 2</span>
+    <span class="hljs-keyword">uint</span> <span class="hljs-keyword">public</span> number2 = <span class="hljs-number">2</span>;   <span class="hljs-comment">// 32 bytes  ───────────── SLOT 3</span>
+}
+</code></pre><p>Uma vez que temos ciência de como isso funciona, podemos usar outros serviços como o Ether.Js para fazermos a consulta de slots presentes no contrato. </p>
+<pre><code>
+<span class="hljs-keyword">const</span> slot0Bytes = <span class="hljs-keyword">await</span> ethers.provider.getStorageAt(demo.address, <span class="hljs-number">0</span>);
+</code></pre><p>desta forma, temos o controle de dados mal gerenciados por arte dos smart contracts, e então podemos agra de fato seguirmos para a segunda parte:</p>
+<h3 id="timestamp-dependence">Timestamp Dependence</h3>
+<pre><code>
+┌──┬───────────────────────────────────────────────────────────────┐
+│<span class="hljs-number">1</span> │pragma solidity ^<span class="hljs-number">0.8</span><span class="hljs-number">.0</span>;                                        │
+│<span class="hljs-number">2</span> │                                                               │
+│<span class="hljs-number">3</span> │contract VulnerableGovernance {                                │
+│<span class="hljs-number">4</span> │    address <span class="hljs-keyword">public</span> founder;                                    │
+│<span class="hljs-number">5</span> │    <span class="hljs-keyword">uint</span> <span class="hljs-keyword">public</span> proposalCount;                                 │
+│<span class="hljs-number">6</span> │    <span class="hljs-keyword">uint</span> <span class="hljs-keyword">public</span> lastRewardCycle;                               │
+│<span class="hljs-number">7</span> │    mapping(address =&gt; <span class="hljs-keyword">uint</span>) <span class="hljs-keyword">public</span> votingPower;               │
+│<span class="hljs-number">8</span> │    mapping(<span class="hljs-keyword">uint</span> =&gt; Proposal) <span class="hljs-keyword">public</span> proposals;                │
+│<span class="hljs-number">9</span> │    mapping(address =&gt; <span class="hljs-keyword">uint</span>) <span class="hljs-keyword">public</span> tokenBalances;             │
+│<span class="hljs-number">10</span>│                                                               │
+│<span class="hljs-number">11</span>│    struct Proposal {                                          │
+│<span class="hljs-number">12</span>│        address proposer;                                      │
+│<span class="hljs-number">13</span>│        <span class="hljs-keyword">uint</span> voteCount;                                        │
+│<span class="hljs-number">14</span>│        <span class="hljs-keyword">uint</span> endTime;                                          │
+│<span class="hljs-number">15</span>│        <span class="hljs-keyword">bool</span> executed;                                         │
+│<span class="hljs-number">16</span>│    }                                                          │
+│<span class="hljs-number">17</span>│                                                               │
+│<span class="hljs-number">18</span>│    constructor() {                                            │
+│<span class="hljs-number">19</span>│        founder = msg.sender;                                  │
+│<span class="hljs-number">20</span>│        lastRewardCycle = block.timestamp;                     │
+│<span class="hljs-number">21</span>│        votingPower[msg.sender] = <span class="hljs-number">1000</span>;                        │
+│<span class="hljs-number">22</span>│    }                                                          │
+│<span class="hljs-number">23</span>│                                                               │
+│<span class="hljs-number">24</span>│    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">createProposal</span><span class="hljs-params">()</span> <span class="hljs-title">external</span> </span>{                       │
+│<span class="hljs-number">25</span>│        <span class="hljs-keyword">require</span>(votingPower[msg.sender] &gt; <span class="hljs-number">0</span>);                  │
+│<span class="hljs-number">26</span>│        proposalCount++;                                       │
+│<span class="hljs-number">27</span>│        proposals[proposalCount] = Proposal({                  │
+│<span class="hljs-number">28</span>│            proposer: msg.sender,                              │
+│<span class="hljs-number">29</span>│            voteCount: <span class="hljs-number">0</span>,                                      │
+│<span class="hljs-number">30</span>│            endTime: block.timestamp + <span class="hljs-number">1</span> days,                 │
+│<span class="hljs-number">31</span>│            executed: <span class="hljs-keyword">false</span>                                    │
+│<span class="hljs-number">32</span>│        });                                                    │
+│<span class="hljs-number">33</span>│    }                                                          │
+│<span class="hljs-number">34</span>│                                                               │
+│<span class="hljs-number">35</span>│    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">vote</span><span class="hljs-params">(uint proposalId, uint votes)</span> <span class="hljs-title">external</span> </span>{      │
+│<span class="hljs-number">36</span>│        Proposal storage prop = proposals[proposalId];         │
+│<span class="hljs-number">37</span>│        <span class="hljs-keyword">require</span>(votingPower[msg.sender] &gt;= votes);             │
+│<span class="hljs-number">38</span>│        <span class="hljs-keyword">require</span>(block.timestamp &lt; prop.endTime);               │
+│<span class="hljs-number">39</span>│        prop.voteCount += votes;                               │
+│<span class="hljs-number">40</span>│        votingPower[msg.sender] -= votes;                      │
+│<span class="hljs-number">41</span>│                                                               │
+│<span class="hljs-number">42</span>│        <span class="hljs-keyword">if</span> (block.timestamp &gt; lastRewardCycle + <span class="hljs-number">15</span>) {          │
+│<span class="hljs-number">43</span>│            distributeRewards(prop.proposer);                  │
+│<span class="hljs-number">44</span>│            lastRewardCycle = block.timestamp;                 │
+│<span class="hljs-number">45</span>│        }                                                      │
+│<span class="hljs-number">46</span>│    }                                                          │
+│<span class="hljs-number">47</span>│                                                               │
+│<span class="hljs-number">48</span>│    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">distributeRewards</span><span class="hljs-params">(address recipient)</span> <span class="hljs-title">internal</span> </span>{   │
+│<span class="hljs-number">49</span>│        <span class="hljs-keyword">uint</span> reward = (block.timestamp - lastRewardCycle) / <span class="hljs-number">15</span>;│
+│<span class="hljs-number">50</span>│        tokenBalances[recipient] += reward * <span class="hljs-number">1</span> ether;          │
+│<span class="hljs-number">51</span>│    }                                                          │
+│<span class="hljs-number">52</span>│                                                               │
+│<span class="hljs-number">53</span>│    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">executeProposal</span><span class="hljs-params">(uint proposalId)</span> <span class="hljs-title">external</span> </span>{       │
+│<span class="hljs-number">54</span>│        Proposal storage prop = proposals[proposalId];         │
+│<span class="hljs-number">55</span>│        <span class="hljs-keyword">require</span>(block.timestamp &gt; prop.endTime);               │
+│<span class="hljs-number">56</span>│        <span class="hljs-keyword">require</span>(!prop.executed);                               │
+│<span class="hljs-number">57</span>│        <span class="hljs-keyword">if</span> (prop.voteCount &gt; <span class="hljs-number">100</span>) {                            │
+│<span class="hljs-number">58</span>│            prop.executed = <span class="hljs-keyword">true</span>;                              │
+│<span class="hljs-number">59</span>│            votingPower[prop.proposer] += <span class="hljs-number">200</span>;                 │
+│<span class="hljs-number">60</span>│        }                                                      │
+│<span class="hljs-number">61</span>│    }                                                          │
+│<span class="hljs-number">62</span>│                                                               │
+│<span class="hljs-number">63</span>│    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">addVotingPower</span><span class="hljs-params">(address voter)</span> <span class="hljs-title">external</span> <span class="hljs-title">payable</span> </span>{  │
+│<span class="hljs-number">64</span>│        votingPower[voter] += msg.value / <span class="hljs-number">1</span> ether;             │
+│<span class="hljs-number">65</span>│    }                                                          │
+│<span class="hljs-number">66</span>│}                                                              │
+└──┴───────────────────────────────────────────────────────────────┘
+</code></pre><p>Um contrato estritamente simples, correto? Você cria uma <code>proposal</code>, faz a sua votação referente a ela, e por fim, é recompensado com tokens após isto pelo <code>distributeRewards</code>.  </p>
+<p>A variável <code>lastRewardCycle</code>, que registra o último ciclo de recompensas, é inicializada com o timestamp do bloco no momento da implantação do contrato e atualizada sempre que uma condição específica é atendida durante a execução da função de votação. Essa informação é pública, devido a um getter que é gerado automaticamente, o que permite que qualquer participante o value de <code>lastRewardCycle</code>. Além disso, o timestamp do bloco atual, representado por <code>block.timestamp</code>, é um dado que pela sua própria instância, referncia blockchain Ethereum, disponível para todos os nós e contratos em execução.</p>
+<p>A vulnerabilidade surge em dois pontos: a combinação desses valores permite o tracking do contrato e a execução de eventos baseados em tempo. Como esses valores são publicamente acessíveis, o contrato fica exposto à <strong>Timestamp Dependence</strong> (Dependência de Timestamp), uma falha que explora a reliance em funções dependentes de <code>block.timestamp</code>. Mas em combinação, também temos neste trecho um evento de <code>mint</code>, a geração de tokens e distribuição destes.</p>
+<p>O atacante aproveita uma brecha na função vote(), que dispara a criação de novos tokens (<em>mint</em>) a cada 15 segundos, dependendo do block.timestamp. A falha acontece por dois motivos: a função vote() ativa distributeRewards() sempre que block.timestamp &gt; lastRewardCycle + 15, permitindo <em>minting</em> sem parar, e o valor de lastRewardCycle é público na blockchain, deixando o atacante calcular o momento perfeito para agir.</p>
+<table>
+<thead>
+<tr>
+<th>Tempo (s)</th>
+<th>Ação</th>
+<th>Tokens Mintados (Founder)  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Primeiro <code>vote()</code></td>
+<td>+1.0  </td>
+</tr>
+<tr>
+<td>15</td>
+<td>Segundo <code>vote()</code></td>
+<td>+1.0 → Total: 2.0  </td>
+</tr>
+<tr>
+<td>30</td>
+<td>Terceiro <code>vote()</code></td>
+<td>+1.0 → Total: 3.0  </td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...  </td>
+</tr>
+<tr>
+<td>3600</td>
+<td>240º <code>vote()</code></td>
+<td>+1.0 → Total: 240.0  </td>
+</tr>
+</tbody>
+</table>
+<p>O atacante sabe que a função vote() ativa o mint a cada 15 segundos, e como lastRewardCycle é público na blockchain, ele pode explorar isso facilmente. A cada chamada, novos tokens são gerados para o founder, causando inflação descontrolada e comprometendo a governança. O resultado é catastrófico: o token perde valor, e o contrato entra em colapso.</p>
+<pre><code>
+  107<span class="hljs-selector-class">.71</span>  ┼
+  102<span class="hljs-selector-class">.59</span>  ┼╮
+   97<span class="hljs-selector-class">.47</span>  ┤│
+   92<span class="hljs-selector-class">.35</span>  ┤│
+   87<span class="hljs-selector-class">.24</span>  ┤╰╮
+   82<span class="hljs-selector-class">.12</span>  ┤ │
+   77<span class="hljs-selector-class">.00</span>  ┤ │
+   71<span class="hljs-selector-class">.88</span>  ┤ │
+   66<span class="hljs-selector-class">.76</span>  ┤ ╰─╮
+   61<span class="hljs-selector-class">.65</span>  ┤   │
+   56<span class="hljs-selector-class">.53</span>  ┤   │
+   51<span class="hljs-selector-class">.41</span>  ┤   │╭╮
+   46<span class="hljs-selector-class">.29</span>  ┤   ╰╯╰╮
+   41<span class="hljs-selector-class">.18</span>  ┤      │
+   36<span class="hljs-selector-class">.06</span>  ┤      │
+   30<span class="hljs-selector-class">.94</span>  ┤      ╰──╮
+   25<span class="hljs-selector-class">.82</span>  ┤         │
+   20<span class="hljs-selector-class">.70</span>  ┤         ╰╮
+   15<span class="hljs-selector-class">.59</span>  ┤          ╰──╮
+   10<span class="hljs-selector-class">.47</span>  ┤             ╰─╮╭╮
+    5<span class="hljs-selector-class">.35</span>  ┤               ╰╯╰─────╮
+    0<span class="hljs-selector-class">.23</span>  ┤                       ╰───────────────
+</code></pre><p>Com a geração de tantos tokens em um determinado período de tempo, o atacante pode simplesmente conseguir manipular o valor de mercado do ativo e até mesmo desvalorizar ele completamente - não só pelo <code>mint</code>, mas funções como <code>burn</code>também tem esse efeito.</p>
+<p>para quem tiver interesse e quiser simular e testar a vulnerabilidade, segue abaixo o contrato.</p>
+<pre><code>
+<span class="hljs-number">0</span>x5802016Bc9976C6f63D6170157adAeA<span class="hljs-number">1924586c1</span>
+</code></pre><h2 id="randomness-">Randomness:</h2>
+<p>Como foi citado anteriormente, não somente investidores tem interesse em smart contracts, mas empresas também, e esta segunda vulnerabilidade eu irei abordar a respeito de um nicho um tanto quanto peculiar: Cassinos.</p>
+<p>O uso da criptomoeda se popularizou nos jogos de azar, com a sua geração de tokens ERC20, e toda a segurança e descentralização que o ethereum pode promover. Todavia,
+a blockchain do Ethereum é determinística e, por isso, impõe certas dificuldades para quem opta por escrever seu próprio gerador de números pseudoaleatórios (PRNG), o que se é fundamental no ramo de jogos de apostas. </p>
+<p>Claro que não basta utiliza a função, e sim atender a uma série de fatores que permitem que a vulnerabilidade seja explorada.</p>
+<ul>
+<li>NGs que utilizam variáveis de bloco como fonte de entropia</li>
+<li>PRNGs baseados no <em>blockhash</em> de algum bloco anterior</li>
+<li>PRNGs baseados no <em>blockhash</em> de um bloco anterior combinado com uma semente considerada privada</li>
+</ul>
+<p>Lembra da falha mencionada anteriormente, relacionada à inconfidencialidade da função <code>block.timestamp</code>? Funções como <code>block.coinbase</code>, que representa o endereço do minerador que minerou o bloco atual; <code>block.difficulty</code>, que é uma medida relativa da dificuldade para encontrar o bloco; <code>block.gaslimit</code>, que define o limite máximo de consumo de <em>gas</em> para transações no bloco; <code>block.number</code>, que indica a altura do bloco atual — todas essas informações, por serem públicas e acessíveis, podem ser manipuladas ou previstas. Isso as torna fontes fracas de entropia para gerar números pseudoaleatórios, comprometendo a segurança de PRNGs utilizados em contratos inteligentes.</p>
+<blockquote>
+<p>“*Entropia é aleatoriedade coletada por um sistema operacional ou aplicativo para uso em criptografia ou outros usos que requerem dados aleatórios.”</p>
+</blockquote>
+<h3 id="block-blockhash">Block.blockhash</h3>
+<p>Todo bloco de ethereum na blockchain tem o seu hash de verificação. Durante o deploy do contract, a EVM permite que seja acessível e obtido tal informação por meio da <code>block.blockhash</code>. Ela pode receber um parâmetro de valor inteiro que será passado como a posição do bloco que será consultado, e caso não receba nada, retornará um bloco em uma cadeia onde sua idade é 256 blocos do atual.</p>
+<p>aqui está um exemplo: </p>
+<pre><code>
+┌─┬────────────────────────────────────────────────────────────────────┐
+│<span class="hljs-number">1</span>│uint256 constant private FACTOR =  <span class="hljs-number">147218756328516856.</span>...;          │
+│<span class="hljs-number">2</span>│function rand(uint max) constant private returns (uint256 result){  │
+│<span class="hljs-number">3</span>│  uint256 factor = FACTOR * <span class="hljs-number">100</span> / max;                              │
+│<span class="hljs-number">4</span>│  uint256 lastBlockNumber = block.number - <span class="hljs-number">1</span>;                       │
+│<span class="hljs-number">5</span>│  uint256 hashVal = uint256(block.blockhash(lastBlockNumber));      │
+│<span class="hljs-number">6</span>│  return uint256((uint256(hashVal) / factor)) % max;                │
+│<span class="hljs-number">7</span>│}                                                                   │
+└─┴────────────────────────────────────────────────────────────────────┘
+</code></pre><p>Alguns contratos utilizam o método <code>block.number - 1</code>, que acessa o <em>blockhash</em> do último bloco gerado. No entanto, isso representa um problema, pois trata-se de um valor estático e previsível. Um atacante pode explorar essa previsibilidade criando um contrato em paralelo e realizando uma chamada com uma mensagem interna. Isso pode resultar na criação de dois contratos utilizando exatamente o mesmo PRNG, tornando possível antecipar ou manipular os resultados.</p>
+<pre><code>
+
+<span class="fortran">┌──┬─────────────────────────────────────────────────────────────────────┐
+│<span class="hljs-number">1</span> │<span class="hljs-function"><span class="hljs-keyword">function</span></span> predictRandom(uint256 <span class="hljs-built_in">max</span>) <span class="hljs-keyword">private</span> view returns (uint256) { │
+│<span class="hljs-number">2</span> │uint256 factor = FACTOR * <span class="hljs-number">100</span> / <span class="hljs-built_in">max</span>;                                 │
+│<span class="hljs-number">3</span> │uint256 lastBlockNumber = block.<span class="hljs-keyword">number</span> - <span class="hljs-number">1</span>;                          │
+│<span class="hljs-number">4</span> │uint256 hashVal = uint256(blockhash(lastBlockNumber));               │
+│<span class="hljs-number">5</span> │<span class="hljs-keyword">return</span> uint256((hashVal / factor)) % <span class="hljs-built_in">max</span>;                            │
+│<span class="hljs-number">6</span> │}                                                                    │
+│<span class="hljs-number">7</span> │                                                                     │
+│<span class="hljs-number">8</span> │<span class="hljs-function"><span class="hljs-keyword">function</span></span> attack() <span class="hljs-keyword">public</span> payable returns (bool) {                    │
+│<span class="hljs-number">9</span> │require (msg.<span class="hljs-keyword">value</span> &gt;= <span class="hljs-number">0.1</span> ether, <span class="hljs-string">"Send at least 0.1 ETH"</span>);           │
+│<span class="hljs-number">10</span>│ uint256 predictedNumber = predictRandom(<span class="hljs-number">2</span>);                         │
+│<span class="hljs-number">11</span>│bool success = <span class="hljs-keyword">target</span>.playGame{<span class="hljs-keyword">value</span>: msg.<span class="hljs-keyword">value</span>}(predictedNumber);   │
+│<span class="hljs-number">12</span>│ <span class="hljs-keyword">return</span> success;                                                     │
+└──┴─────────────────────────────────────────────────────────────────────┘
+
+  }</span>
+</code></pre><h3 id="private-seeds">Private Seeds</h3>
+<p>Algumas empresas durante o desenvolvimento e visando as falhas já conhecidas, decidiram aumentar a entropia, e fazem uma espécie de <code>salt</code>para a adicionar na função - conhecida como <code>private seed</code>.</p>
+<pre><code>
+┌─┬─────────────────────────────────────────────────────┐
+│<span class="hljs-number">1</span>│bytes32 _a = block.blockhash(block.number - pointer);│
+│<span class="hljs-number">2</span>│for (uint i = <span class="hljs-number">31</span>; i &gt;= <span class="hljs-number">1</span>; i--) {                     │
+│<span class="hljs-number">3</span>│if ((uint8(_a[i]) &gt;= <span class="hljs-number">48</span>) &amp;&amp; (uint8(_a[i]) &lt;= <span class="hljs-number">57</span>)) {  │
+│<span class="hljs-number">4</span>│return uint8(_a[i]) - <span class="hljs-number">48</span>;                            │
+│<span class="hljs-number">5</span>│  }                                                  │
+│<span class="hljs-number">6</span>│}                                                    │
+└─┴─────────────────────────────────────────────────────┘
+</code></pre><p>A variável pointer foi declarada como privada, o que significa que outros contratos não podem acessar seu valor. Após cada jogo, o número vencedor entre 1 e 9 era atribuído a essa variável, que então era usada como um deslocamento (offset) do block.number atual ao recuperar o blockhash.</p>
+<p>Devido o seu princípio de transparência, a blockchain não deve ser usada para armazenar segredos em texto simples. Embora variáveis privadas sejam protegidas de outros contratos, é possível obter o conteúdo do armazenamento do contrato fora da cadeia (off-chain). Por exemplo, o popular cliente Ethereum Web3 possui o método de API <code>web3.eth.getStorageAt()</code>, que permite recuperar entradas de armazenamento nos índices especificados.</p>
+<pre><code>
+┌─┬────────────────────────────────────────────────────────────┐
+│<span class="hljs-number">1</span>│<span class="hljs-function"><span class="hljs-keyword">function</span></span> exploitation(address addr, uint8 <span class="hljs-keyword">number</span>) payable { │
+│<span class="hljs-number">2</span>│Slotthereum <span class="hljs-keyword">target</span> = Slotthereum(addr);                     │
+│<span class="hljs-number">3</span>│vuln_pointer = <span class="hljs-keyword">number</span>;                                      │
+│<span class="hljs-number">4</span>│uint8 win = getNumber(getBlockHash(vuln_pointer));          │
+│<span class="hljs-number">5</span>│<span class="hljs-keyword">target</span>.placeBet.<span class="hljs-keyword">value</span>(msg.<span class="hljs-keyword">value</span>)(win, win);                 │
+│<span class="hljs-number">6</span>│}                                                           │
+└─┴────────────────────────────────────────────────────────────┘
+</code></pre><p>O que este código consegue prever e sempre acertar a aposta, uma vez que o valor resgatado pelo <code>vuln_pointer</code> sempre será predictado devido a exploração off-chain  de um dado teoricamente privado. O código será reexecutado e o número vitorioso sempre sairá.</p>
+<h3 id="front-running-attack">front-running attack</h3>
+<p>Este ataque ele aborda temas como o gas e a mempool, e podemos explicar de forma teórica junto a um adicional de um desenho:</p>
+<p>O usuário A cria um bloco, uma palavra-passe deve ser enviada para o hash ser digerido e o bloco minerado para o minerador receber 10ETH.</p>
+<p>O usuário B consegue realizar este evento, chamando uma função <code>solve(&quot;senha&quot;)</code> gastando um preço de gas na unidade de 15 gwei.</p>
+<p>O usuário C estava monitorando a mempool, e consegue ver o evento realizado por B, e chama <code>solve(&quot;senha&quot;)</code> com um valor de 150 gwei. </p>
+<p>A transação de C é resolvida na frente de B, fazendo com que ele minere o bloco e tome a recompensa.</p>
+<pre><code>
+    ┌─────┐      ┌─────┐      ┌─────┐      ┌─────┐
+    │ B1  ├──┐   │ B2  ├──┐   │ B3  ├──┐   │ B4  │
+    │ H:A │  └───┤ H:B │  └───┤ H:C │  └───┤ H:D │
+    │ D:<span class="hljs-number">0</span> │      │ D:<span class="hljs-number">0</span> │      │ D:<span class="hljs-number">0</span> │      │ D:X'│ ← Transação do atacante
+    │ P:<span class="hljs-number">0</span> │      │ P:A │      │ P:B │      │ P:C │
+    └─────┘      └─────┘      └─────┘      └─────┘
+           ↑             ↑            ↑
+    ┌──────┐      ┌──────┐      ┌──────┐
+    │ V1   │      │ V2   │      │ V3   │
+    │ S:<span class="hljs-number">32</span> │      │ S:<span class="hljs-number">32</span> │      │ S:<span class="hljs-number">32</span> │
+    │ T:X' │      │ T:X' │      │ T:X' │ ← Validadores processam X' primeiro
+    └──────┘      └──────┘      └──────┘
+
+    [Mempool antes de B4 ser finalizado]
+    ┌────────────┐    ┌────────────┐
+    │ T:X        │    │ T:X'       │
+    │ Gas: <span class="hljs-number">20</span>    │    │ Gas: <span class="hljs-number">50</span>    │ ← Atacante paga mais gas
+    │ (Original) │    │ (Ataque)   │
+    └────────────┘    └────────────┘
+</code></pre><h1 id="conclus-o">Conclusão</h1>
+<p>Definitivamente não sou bom com despedidas, mas acredito que depois de tantas informações e vetores que foram exemplificados, você provavelmente irá querer voltar para saber mais.</p>
+<pre><code>                                         _.oo.
+                 _.u[[/;:,.         .odMMMMMM'
+              .o888UU[[[/;:-.  .o<span class="hljs-meta">@P^</span>    MMM^
+             oN88888UU[[[/;::-.        dP^
+            dNMMNN888UU[[[/;:--.   .o<span class="hljs-meta">@P^</span>
+           ,MMMMMMN888UU[[/;::-. o<span class="hljs-meta">@^</span>
+           NNMMMNN888UU[[[/~.o<span class="hljs-meta">@P^</span>
+           888888888UU[[[/o<span class="hljs-meta">@^-..</span>
+          oI8888UU[[[/o<span class="hljs-meta">@P^:--..</span>
+       .<span class="hljs-meta">@^</span>  YUU[[[/o<span class="hljs-meta">@^;::---..</span>
+     oMP     ^/o<span class="hljs-meta">@P^;:::---..</span>
+  .dMMM    .o<span class="hljs-meta">@^</span> ^;::---...
+ dMMMMMMM<span class="hljs-meta">@^`</span>       `^^^^
+YMMMUP^
+ ^^
+</code></pre>
