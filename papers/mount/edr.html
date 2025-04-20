@@ -21,11 +21,11 @@
 
 <h2 id="1-introdu-o">1. Introdução</h2>
 <p>Soluções EDR aka (Endpoint Detection and Response) são uma evolução dos softwares de segurança que conhecemos como antivírus, EDRs modermos usam tecnicas avanças para detectar ameaça, Hookando APIS, isolando o host da internet, analisando comportamento e classificando a detecção por regra de Indicador de Compromisso (IOC) classificadas pelo MITRE ATT&amp;CK</p>
-<p>nesse artigo demonstrarei burlar EDRs usando tecnicas evasivas </p>
+<p>nesse artigo demonstrarei como burlar EDRs usando tecnicas evasivas </p>
 <h2 id="2-analise-tecnica">2. Analise Tecnica</h2>
 <p>em um ataque real é comun o uso de &quot;Loaders&quot; e &quot;Droppers&quot; que carregam o malware principal passando por &#39;estagios&#39;
 esses estagios podem variar dependendo da complexidade do malware algo que conhecemos como Chain ou Cadeia
-isso é nescesario para nosso ataque não seja interrompido por um AV/EDRs rodando em segundo plano </p>
+isso é necessário para nosso ataque não seja interrompido por um AV/EDRs rodando em segundo plano </p>
 <p>aqui abaixo está um loader shellcode super simples:</p>
 <pre><code class="lang-cpp">#include &lt;stdio.h&gt;
 #include &lt;stdlib.h&gt;
