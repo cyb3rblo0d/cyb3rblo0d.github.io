@@ -1,11 +1,10 @@
 <html>
-
 <head>
-  <title>DIGITAL WASTELAND - Papers</title>
+  <title>Cyberblood - Tools</title>
   <style>
     body {
-        background: #000;
-        color: #fff;
+      background: #000;
+      color: #fff;
       font-family: monospace;
       margin: 0;
       padding: 20px;
@@ -27,14 +26,12 @@
     }
 
     .section {
-
       margin-bottom: 30px;
     }
 
     .group {
       display: flex;
       gap: 20px;
-      
     }
 
     .section-title {
@@ -64,39 +61,40 @@
       margin: 0 10px;
     }
 
-    .paper {
+    .tool {
       margin-bottom: 20px;
       width: 50%;
-      /* exactly 2 per line */
       box-sizing: border-box;
       padding-right: 10px;
-      /* optional spacing between items */
       margin-bottom: 20px;
-
     }
 
-    .paper-title {
+    .tool-title {
       margin-bottom: 5px;
     }
 
-    .paper-meta {
+    .tool-meta {
       color: #666;
       margin-bottom: 5px;
       font-size: 12px;
     }
 
-    .paper-desc {
+    .tool-tags {
       color: #999;
       margin-left: 20px;
     }
+
     .navbar {
-        display: flex;
-        width: 100%;
-        align-items: center;
-        justify-content: center;
-    } .navbar a {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .navbar a {
       margin: 0 10px;
     }
+
     .imageport {
       width: 100%;
       display: flex;
@@ -105,10 +103,11 @@
     }
 
     .imageport img {
-      max-width: 30%;
+      max-width: 50%;
       height: auto;
       display: block;
     }
+
     .footer {
       position: fixed;
       bottom: 0;
@@ -130,6 +129,7 @@
     .footer div {
       margin: 5px 0;
     }
+
     .footer-section {
       display: flex;
       align-items: center;
@@ -137,61 +137,48 @@
     }
   </style>
 </head>
-
 <body>
-    <div class="navbar">
-        <div>
-          <a href="index.html">[home]</a>
-          <a href="papers.html">[papers]</a>
-          <a href="exploits.html">[exploits]</a>
-          <a href="tools.html">[tools]</a>
-          <a href="contributing.html">[contributing]</a>
+  <div class="navbar">
+    <div>
+      <a href="/">[home]</a>
+      <a href="papers.html">[papers]</a>
+      <a href="exploits.html">[exploits]</a>
+      <a href="tools.html">[tools]</a>
+      <a href="contributing.html">[contributing]</a>
     </div>
-      </div>
-      <div class="nav">
-</div>
+  </div>
+  <div class="nav"></div>
   <div class="container">
-    <h1>[ PAPERS ARCHIVE ]</h1>
+    <h1>[ TOOLS ARCHIVE ]</h1>
     <div class="imageport">
-        <img src="static/ilsSpSU.png"/>
-      </div>
-    <div class="section">
-      <div class="section-title">// latest papers</div>
-      <div class="group">
-        <div class="paper">
-          <div class="paper-title"><a href="papers/mount/edr.html">The Art of EDR Bypass</a></div>
-          <div class="paper-meta">by mount // 2025-04-01</div>
-        </div>
-
-        <div class="paper">
-          <div class="paper-title"><a href="papers/vyper/scp.html">Smart Contract Pwning</a></div>
-          <div class="paper-meta">by vyper // 2025-03-28</div>
-        </div>
-
-        <div class="paper">
-          <div class="paper-title"><a href="papers/mount/ad.html">Pwn1ng_4ctiv3_D1r3ct0ry</a></div>
-          <div class="paper-meta">by mount // 2025-03-25</div>
-        </div>
-      </div>
-
+      <img src="TnrKEMu.png"/>
     </div>
-
-
+    <div class="section">
+      <div class="section-title">// latest tools</div>
+      <div class="group">
+        <div class="tool">
+          <div class="tool-title"><a href="https://gitea.com/Vyper/Mihra">Mihra</a></div>
+          <div class="tool-meta">by Vyper // 2025-04-22</div>
+          <div class="tool-tags">Tags: C2, Persistence, security</div>
+        </div>
+        <div class="tool">
+          <div class="tool-title"><a href="https://giteea.com/Vyper/deadlock">deadlock</a></div>
+          <div class="tool-meta">by cryptoking // 2025-04-01</div>
+          <div class="tool-tags">Tags: cryptography, locker, malware</div>
+        </div>
+      </div>
+    </div>
     <div class="section">
       <div class="section-title">// archives</div>
-
     </div>
-
-  
   </div>
   <div class="footer">
     <div class="footer-title">Contact</div>
     <div class="footer-section">
-    <div>irc: #----- @ -----</div>
-    <div>#----- @ ----- (port 23)</div>
-    <div>pgp: -----</div>
-  </div>
+      <div>irc: #----- @ -----</div>
+      <div>#----- @ ----- (port 23)</div>
+      <div>pgp: -----</div>
+    </div>
   </div>
 </body>
-
 </html>
